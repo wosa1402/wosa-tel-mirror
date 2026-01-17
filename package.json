@@ -1,0 +1,12 @@
+{
+  "name": "tg-back",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "poc": "pnpm -C apps/mirror-service poc",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["bufferutil", "es5-ext", "esbuild", "utf-8-validate"]
+  }
+}
