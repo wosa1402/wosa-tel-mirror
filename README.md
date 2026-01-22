@@ -83,6 +83,8 @@ pnpm dev:mirror
 - `频道管理` (`/channels`) 添加源频道
 - 首页查看“同步服务在线/离线”，在 `事件中心` (`/events`) 查看关键日志
 
+> 小提示：如果你已经完成过 Telegram 登录（session 已写入 DB），也可以用一条命令同时启动两个开发进程：`pnpm dev:all`。
+
 ---
 
 ## 生产部署（推荐：Git 拉取 + 构建 + 进程保活）
@@ -111,11 +113,17 @@ pnpm db:migrate
 pnpm -C apps/web build
 ```
 
-4) 启动两个进程（建议用 pm2/systemd 做保活）：
+4) 启动（最简单：单命令同时启动两个进程；也可分别启动）：
 
 ```bash
-pnpm -C apps/web start
-pnpm -C apps/mirror-service start
+pnpm start:all
+```
+
+或分别启动：
+
+```bash
+pnpm start:web
+pnpm start:mirror
 ```
 
 5) 第一次使用：

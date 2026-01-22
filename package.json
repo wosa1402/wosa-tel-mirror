@@ -5,9 +5,14 @@
   "scripts": {
     "db:generate": "pnpm -C packages/db drizzle:generate",
     "db:migrate": "pnpm -C packages/db drizzle:migrate",
+    "build": "pnpm -C apps/web build",
     "dev:mirror": "pnpm -C apps/mirror-service dev",
+    "dev:all": "node scripts/run-all.mjs dev",
     "dev:web": "pnpm -C apps/web dev",
     "poc": "pnpm -C apps/mirror-service poc",
+    "start:web": "pnpm -C apps/web start",
+    "start:mirror": "pnpm -C apps/mirror-service start",
+    "start:all": "node scripts/run-all.mjs start",
     "typecheck": "pnpm -r typecheck"
   },
   "pnpm": {
