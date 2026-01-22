@@ -11,3 +11,12 @@ dist
 # Telegram session (local PoC)
 .telegram-session
 
+test-db.js
+R-UI/
+
+# Documentation files
+AGENTS.md
+TEST_TODO.md
+DESIGN.md
+IMPLEMENTATION.md
+ROADMAP.md

@@ -1,0 +1,1 @@
+ALTER TABLE "source_channels" ADD COLUMN "group_name" text DEFAULT '' NOT NULL;

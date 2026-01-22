@@ -2,11 +2,15 @@
   "name": "@tg-back/mirror-service",
   "private": true,
   "scripts": {
+    "dev": "tsx src/index.ts",
     "poc": "tsx src/poc.ts",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@tg-back/db": "workspace:*",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.44.4",
     "telegram": "^2.26.16"
   },
   "devDependencies": {
@@ -15,4 +19,3 @@
     "typescript": "^5.9.2"
   }
 }
-

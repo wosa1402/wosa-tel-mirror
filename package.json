@@ -3,10 +3,21 @@
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "scripts": {
+    "db:generate": "pnpm -C packages/db drizzle:generate",
+    "db:migrate": "pnpm -C packages/db drizzle:migrate",
+    "dev:mirror": "pnpm -C apps/mirror-service dev",
+    "dev:web": "pnpm -C apps/web dev",
     "poc": "pnpm -C apps/mirror-service poc",
     "typecheck": "pnpm -r typecheck"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["bufferutil", "es5-ext", "esbuild", "utf-8-validate"]
+    "onlyBuiltDependencies": [
+      "bufferutil",
+      "es5-ext",
+      "esbuild",
+      "sharp",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
   }
 }

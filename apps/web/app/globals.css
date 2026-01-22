@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+}
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-900;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl shadow-black/5;
+  }
+
+  .hover-lift {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .gradient-border {
+    @apply relative;
+  }
+
+  .gradient-border::before {
+    @apply content-[''] absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 transition-opacity duration-300;
+    z-index: -1;
+    filter: blur(8px);
+  }
+
+  .gradient-border:hover::before {
+    @apply opacity-20;
+  }
+
+  .ui-card {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl shadow-black/5 rounded-2xl p-6;
+  }
+
+  .ui-section-title {
+    @apply text-base font-semibold text-gray-900;
+  }
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .ui-btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30 hover:opacity-95;
+  }
+
+  .ui-btn-secondary {
+    @apply bg-white/50 border border-gray-200 text-gray-700 hover:bg-white;
+  }
+
+  .ui-btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .ui-icon-btn {
+    @apply inline-flex items-center justify-center rounded-lg p-2 transition-all hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .ui-badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .ui-badge-success {
+    @apply bg-green-100 text-green-700;
+  }
+
+  .ui-badge-info {
+    @apply bg-blue-100 text-blue-700;
+  }
+
+  .ui-badge-warn {
+    @apply bg-orange-100 text-orange-700;
+  }
+
+  .ui-badge-error {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .ui-badge-muted {
+    @apply bg-gray-100 text-gray-700;
+  }
+
+  .ui-progress-track {
+    @apply h-2 w-full overflow-hidden rounded-full bg-gray-100;
+  }
+
+  .ui-progress-bar {
+    @apply h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all;
+  }
+
+  .ui-input {
+    @apply h-10 w-full rounded-xl bg-white/50 border border-gray-200 px-4 text-sm outline-none transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  .ui-textarea {
+    @apply w-full rounded-xl bg-white/50 border border-gray-200 px-4 py-3 text-sm outline-none transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  .ui-select {
+    @apply h-10 w-full rounded-xl bg-white/50 border border-gray-200 px-4 text-sm outline-none transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  .ui-checkbox {
+    @apply h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500;
+  }
+
+  .ui-alert-error {
+    @apply rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800;
+  }
+
+  .ui-alert-info {
+    @apply rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.18s ease-out both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(209 213 219);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
