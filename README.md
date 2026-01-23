@@ -186,6 +186,13 @@ pnpm db:migrate
 - `/events`：看最近的 warn/error（关键事件）
 - `/logs`：如果配置了 `MIRROR_LOG_FILE`，这里能看到 mirror-service 终端级别日志（最直观）
 
+### 5) 看到 `FLOOD_WAIT` / `A wait of XX seconds is required` 怎么办？
+这是 Telegram 的限流提示（正常现象，不是你的账号/项目坏了）。
+- 等待时间 **不长**（比如几十秒/几分钟）：mirror-service 会自动等待后继续跑，你不用手动干预
+- 等待时间 **很长**（比如 2 小时）：任务会先显示 `paused`，但 mirror-service 会在等待时间到后**自动恢复**继续跑  
+  - 可以通过 `.env` 调大 `MIRROR_FLOOD_WAIT_MAX_SEC`（上限 3600）让更多情况直接自动等待
+  - 建议同时把并发调低（`/settings` 里的 `concurrent_mirrors`），并适当增加 `mirror_interval_ms`，能明显减少触发限流的频率
+
 ---
 
 ## 安全提示

@@ -595,9 +595,10 @@ function getTelegramErrorMessage(error: unknown): string | undefined {
 }
 
 function parseFloodWaitSeconds(error: unknown): number | null {
-  const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : "");
+  const msg =
+    typeof error === "string" ? error : getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : "");
   if (!msg) return null;
-  const m1 = msg.match(/^FLOOD_WAIT_(\d+)$/);
+  const m1 = msg.match(/FLOOD_WAIT_(\d+)/);
   if (m1) return Number.parseInt(m1[1] ?? "", 10);
   const m2 = msg.match(/A wait of (\d+) seconds is required/i);
   if (m2) return Number.parseInt(m2[1] ?? "", 10);
@@ -5038,6 +5039,65 @@ async function loop(): Promise<void> {
     }
   };
 
+  const FLOOD_WAIT_AUTO_RESUME_CHECK_MS = 5_000;
+  let lastFloodWaitAutoResumeAt = 0;
+
+  const ensureFloodWaitAutoResume = async (now: number): Promise<void> => {
+    if (now - lastFloodWaitAutoResumeAt < FLOOD_WAIT_AUTO_RESUME_CHECK_MS) return;
+    lastFloodWaitAutoResumeAt = now;
+
+    const rows = await withDbRetry(
+      () =>
+        db
+          .select({
+            id: schema.syncTasks.id,
+            sourceChannelId: schema.syncTasks.sourceChannelId,
+            taskType: schema.syncTasks.taskType,
+            pausedAt: schema.syncTasks.pausedAt,
+            lastError: schema.syncTasks.lastError,
+          })
+          .from(schema.syncTasks)
+          .where(
+            and(
+              eq(schema.syncTasks.status, "paused"),
+              sql`${schema.syncTasks.pausedAt} is not null`,
+              sql`${schema.syncTasks.lastError} is not null`,
+            ),
+          )
+          .orderBy(asc(schema.syncTasks.pausedAt))
+          .limit(50),
+      "auto resume flood wait tasks",
+      { attempts: 3, baseDelayMs: 250 },
+    );
+
+    for (const row of rows) {
+      if (!row.pausedAt) continue;
+      const waitSeconds = parseFloodWaitSeconds(row.lastError ?? "");
+      if (!waitSeconds || !Number.isFinite(waitSeconds) || waitSeconds <= 0) continue;
+
+      const resumeAtMs = row.pausedAt.getTime() + (waitSeconds + 1) * 1000;
+      if (now < resumeAtMs) continue;
+
+      await withDbRetry(
+        () =>
+          db
+            .update(schema.syncTasks)
+            .set({ status: "pending", startedAt: null, pausedAt: null, lastError: null })
+            .where(eq(schema.syncTasks.id, row.id)),
+        `auto resume flood wait (taskId=${row.id})`,
+        { attempts: 3, baseDelayMs: 250 },
+      );
+
+      void notifyTasksChanged({ taskId: row.id, sourceChannelId: row.sourceChannelId, taskType: row.taskType, status: "pending" });
+
+      await logSyncEvent({
+        sourceChannelId: row.sourceChannelId,
+        level: "info",
+        message: `auto resumed task after FLOOD_WAIT_${waitSeconds}s (taskId=${row.id}, taskType=${row.taskType})`,
+      });
+    }
+  };
+
   for (;;) {
     try {
       const now = Date.now();
@@ -5051,6 +5111,7 @@ async function loop(): Promise<void> {
         await ensureRetryFailedTasks();
       }
 
+      await ensureFloodWaitAutoResume(now);
       await ensureChannelHealthChecks(now);
 
       const { concurrentMirrors } = await getTaskRunnerSettings();

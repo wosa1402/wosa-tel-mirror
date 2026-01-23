@@ -119,6 +119,38 @@ function formatClockTime(value: string | null): string {
   return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
+function parseFloodWaitSecondsFromText(text: string | null): number | null {
+  if (!text) return null;
+  const m1 = text.match(/FLOOD_WAIT_(\d+)/);
+  if (m1) return Number.parseInt(m1[1] ?? "", 10);
+  const m2 = text.match(/A wait of (\d+) seconds is required/i);
+  if (m2) return Number.parseInt(m2[1] ?? "", 10);
+  return null;
+}
+
+function formatRemainingTime(ms: number): string {
+  if (!Number.isFinite(ms)) return "";
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.ceil(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hour = Math.ceil(min / 60);
+  return `${hour}h`;
+}
+
+function getFloodWaitAutoResumeHint(task: Pick<TaskRow, "status" | "lastError" | "pausedAt">): string | null {
+  if (task.status !== "paused") return null;
+  if (!task.pausedAt) return null;
+  const waitSeconds = parseFloodWaitSecondsFromText(task.lastError);
+  if (!waitSeconds || !Number.isFinite(waitSeconds) || waitSeconds <= 0) return null;
+  const pausedAtMs = new Date(task.pausedAt).getTime();
+  if (!Number.isFinite(pausedAtMs)) return null;
+  const resumeAtMs = pausedAtMs + (waitSeconds + 1) * 1000;
+  const remainingMs = resumeAtMs - Date.now();
+  if (remainingMs <= 0) return "Telegram 限流等待已到，任务会自动继续（稍等片刻或刷新）";
+  return `Telegram 限流中，预计 ${formatRemainingTime(remainingMs)} 后自动继续`;
+}
+
 function estimateEta(task: Pick<TaskRow, "startedAt" | "progressCurrent" | "progressTotal" | "status">): string | null {
   if (task.status !== "running") return null;
   if (!task.startedAt) return null;
@@ -993,7 +1025,15 @@ export function TasksManager({
                           ) : null}
                         </div>
 
-                        {t.lastError ? <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div> : null}
+                        {t.lastError ? (
+                          <div className="space-y-1">
+                            <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div>
+                            {(() => {
+                              const hint = getFloodWaitAutoResumeHint(t);
+                              return hint ? <div className="text-xs text-gray-500 dark:text-slate-400">{hint}</div> : null;
+                            })()}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -1105,7 +1145,15 @@ export function TasksManager({
                       ) : null}
                     </div>
 
-                    {t.lastError ? <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div> : null}
+                    {t.lastError ? (
+                      <div className="space-y-1">
+                        <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div>
+                        {(() => {
+                          const hint = getFloodWaitAutoResumeHint(t);
+                          return hint ? <div className="text-xs text-gray-500 dark:text-slate-400">{hint}</div> : null;
+                        })()}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
