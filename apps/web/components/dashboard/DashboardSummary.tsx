@@ -422,14 +422,14 @@ export function DashboardSummary() {
             >
               异常频道（syncStatus=error）
             </div>
-            <a href="/channels" className="text-xs text-blue-700 hover:underline">
+            <a href="/channels" className="text-xs text-blue-700 hover:underline dark:text-blue-300">
               去频道管理查看
             </a>
           </div>
 
           {hasErrorChannels ? (
             <>
-              <div className="mt-2 text-xs text-red-800/80">
+              <div className="mt-2 text-xs text-red-800/80 dark:text-red-200/80">
                 提示：处于 error 的频道会被 mirror-service 暂时跳过（避免反复失败占用并发）。
               </div>
 
@@ -488,7 +488,7 @@ export function DashboardSummary() {
         <div className="mt-4 rounded-2xl border border-gray-200 bg-white/50 p-5 text-sm dark:border-white/10 dark:bg-slate-900/40">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="font-medium text-gray-900 dark:text-slate-100">正在运行的任务</div>
-            <a href="/tasks?status=running" className="text-xs text-blue-700 hover:underline">
+            <a href="/tasks?status=running" className="text-xs text-blue-700 hover:underline dark:text-blue-300">
               去任务页查看
             </a>
           </div>

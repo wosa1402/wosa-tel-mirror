@@ -1442,7 +1442,7 @@ export function MessagesBrowser() {
                               <button
                                 type="button"
                                 onClick={() => toggleExpandedText(m.id)}
-                                className="mt-1 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                className="mt-1 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-medium dark:text-blue-300 dark:hover:text-blue-200"
                               >
                                 {isExpandedText ? "收起全文" : "展开全文"}
                               </button>
@@ -1503,7 +1503,7 @@ export function MessagesBrowser() {
                             href={telegramViewLink}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-700 font-medium"
+                            className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-300 dark:hover:text-blue-200"
                           >
                             在 Telegram 中查看
                           </a>
@@ -1514,7 +1514,7 @@ export function MessagesBrowser() {
                           <button
                             type="button"
                             onClick={() => toggleEditHistory(historyKey, m.editCount)}
-                            className="text-blue-600 hover:text-blue-700 font-medium"
+                            className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-300 dark:hover:text-blue-200"
                           >
                             {openEditHistoryId === historyKey ? "收起历史" : `编辑历史(${m.editCount})`}
                           </button>
@@ -1558,7 +1558,7 @@ export function MessagesBrowser() {
                                         href={item.links.source}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-blue-600 hover:text-blue-700 font-medium"
+                                        className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-300 dark:hover:text-blue-200"
                                       >
                                         原文
                                       </a>
@@ -1570,7 +1570,7 @@ export function MessagesBrowser() {
                                         href={item.links.mirror}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-blue-600 hover:text-blue-700 font-medium"
+                                        className="text-blue-600 hover:text-blue-700 font-medium dark:text-blue-300 dark:hover:text-blue-200"
                                       >
                                         备份
                                       </a>

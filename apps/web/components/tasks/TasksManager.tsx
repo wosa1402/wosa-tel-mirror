@@ -89,9 +89,9 @@ function labelTaskStatus(status: TaskStatus): string {
 }
 
 function taskStatusBadgeClass(status: TaskStatus): string {
-  if (status === "running") return "bg-green-100 text-green-700";
-  if (status === "pending") return "bg-blue-100 text-blue-700";
-  if (status === "failed") return "bg-red-100 text-red-700";
+  if (status === "running") return "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-200";
+  if (status === "pending") return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200";
+  if (status === "failed") return "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200";
   return "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-slate-200";
 }
 
@@ -975,9 +975,9 @@ export function TasksManager({
                               title={t.status === "running" ? "暂停" : t.status === "paused" ? "恢复" : "重启"}
                             >
                               {t.status === "running" ? (
-                                <Pause className="w-5 h-5 text-orange-600" />
+                                <Pause className="w-5 h-5 text-orange-600 dark:text-orange-300" />
                               ) : (
-                                <Play className="w-5 h-5 text-green-600" />
+                                <Play className="w-5 h-5 text-green-600 dark:text-green-300" />
                               )}
                             </button>
                             <button
@@ -987,7 +987,7 @@ export function TasksManager({
                               className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                               title={t.status === "pending" ? "重排队" : "重启"}
                             >
-                              <RefreshCw className="w-5 h-5 text-blue-600" />
+                              <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-300" />
                             </button>
                           </div>
                         </div>
@@ -1095,9 +1095,9 @@ export function TasksManager({
                           title={t.status === "running" ? "暂停" : t.status === "paused" ? "恢复" : "重启"}
                         >
                           {t.status === "running" ? (
-                            <Pause className="w-5 h-5 text-orange-600" />
+                            <Pause className="w-5 h-5 text-orange-600 dark:text-orange-300" />
                           ) : (
-                            <Play className="w-5 h-5 text-green-600" />
+                            <Play className="w-5 h-5 text-green-600 dark:text-green-300" />
                           )}
                         </button>
                         <button
@@ -1107,7 +1107,7 @@ export function TasksManager({
                           className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                           title={t.status === "pending" ? "重排队" : "重启"}
                         >
-                          <RefreshCw className="w-5 h-5 text-blue-600" />
+                          <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-300" />
                         </button>
                       </div>
                     </div>

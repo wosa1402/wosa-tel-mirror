@@ -1093,7 +1093,7 @@ export function ChannelsManager({
               )}
 
               {bulkAddMode && mirrorTarget === "manual" ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                   批量添加提示：如果你选择“指定频道”，这一批新增的源频道都会指向同一个备份频道（消息会混在一起）。如果你想每个源频道独立备份，建议选“自动创建镜像频道”。
                 </div>
               ) : null}
@@ -1124,22 +1124,22 @@ export function ChannelsManager({
 
             {bulkAddMode && bulkAddProgress ? (
               <div className="mt-3 rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm dark:border-white/10 dark:bg-white/5">
-                <div className="text-black/70">
+                <div className="text-black/70 dark:text-slate-300">
                   批量添加进度：{bulkAddProgress.processed}/{bulkAddProgress.total}（创建 {bulkAddProgress.created} · 已存在{" "}
                   {bulkAddProgress.existed} · 失败 {bulkAddProgress.failed}）
                 </div>
                 {bulkAddProgress.current ? (
-                  <div className="mt-1 text-xs text-black/60">当前：{bulkAddProgress.current}</div>
+                  <div className="mt-1 text-xs text-black/60 dark:text-slate-400">当前：{bulkAddProgress.current}</div>
                 ) : null}
                 {bulkAddProgress.failures.length ? (
-                  <div className="mt-2 space-y-1 text-xs text-red-800">
+                  <div className="mt-2 space-y-1 text-xs text-red-800 dark:text-red-200">
                     <div className="font-medium">最近失败：</div>
                     {bulkAddProgress.failures.slice(-10).map((f) => (
                       <div key={`${f.identifier}-${f.error}`} className="whitespace-pre-wrap">
                         - {f.identifier}: {truncateText(f.error, 160)}
                       </div>
                     ))}
-                    <div className="text-black/50">提示：失败不会影响其他成功的频道，你可以只复制失败项再试一次。</div>
+                    <div className="text-black/50 dark:text-slate-400">提示：失败不会影响其他成功的频道，你可以只复制失败项再试一次。</div>
                   </div>
                 ) : null}
               </div>
@@ -1159,7 +1159,7 @@ export function ChannelsManager({
                 <div className="text-base font-semibold">
                   从 Telegram 选择{pickerTarget === "source" ? "源频道" : "镜像目标"}
                 </div>
-                <div className="mt-1 text-sm text-black/60">
+                <div className="mt-1 text-sm text-black/60 dark:text-slate-400">
                   仅展示你账号可访问的频道（包含无 username 的私密频道，会用 -100... 标识）。
                 </div>
               </div>
@@ -1190,20 +1190,20 @@ export function ChannelsManager({
             </div>
 
             {telegramChannelsError ? (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                 {telegramChannelsError}
               </div>
             ) : null}
 
             <div className="mt-4 max-h-[60vh] overflow-auto rounded-md border border-black/10 dark:border-white/10">
               {telegramChannelsLoading && telegramChannels.length === 0 ? (
-                <div className="p-4 text-sm text-black/60">加载中...</div>
+                <div className="p-4 text-sm text-black/60 dark:text-slate-400">加载中...</div>
               ) : filteredTelegramChannels.length === 0 ? (
-                <div className="p-4 text-sm text-black/60">
+                <div className="p-4 text-sm text-black/60 dark:text-slate-400">
                   暂无可选频道{telegramChannelsQuery.trim() ? "（可尝试清空搜索词或刷新列表）" : ""}。
                 </div>
               ) : (
-                <ul className="divide-y divide-black/5">
+                <ul className="divide-y divide-black/5 dark:divide-white/10">
                   {filteredTelegramChannels.map((c) => (
                     <li key={c.identifier}>
                       <button
@@ -1213,13 +1213,13 @@ export function ChannelsManager({
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{c.title}</div>
-                          <div className="mt-0.5 truncate text-xs text-black/60">
+                          <div className="mt-0.5 truncate text-xs text-black/60 dark:text-slate-400">
                             {c.username ? `${c.username} · ` : ""}
                             {c.identifier}
                             {c.telegramId ? ` · id=${c.telegramId}` : ""}
                           </div>
                         </div>
-                        <div className="shrink-0 text-xs text-black/60">选择</div>
+                        <div className="shrink-0 text-xs text-black/60 dark:text-slate-400">选择</div>
                       </button>
                     </li>
                   ))}
@@ -1584,7 +1584,9 @@ export function ChannelsManager({
                           <div className="flex items-center gap-2">
                             <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 truncate">{title}</h3>
                             {c.isProtected ? (
-                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">受保护</span>
+                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full dark:bg-orange-500/15 dark:text-orange-200">
+                                受保护
+                              </span>
                             ) : null}
                             <span
                               className={clsx(
@@ -1609,7 +1611,7 @@ export function ChannelsManager({
                             {c.isActive ? (
                               <Pause className="w-5 h-5 text-gray-600 dark:text-slate-300" />
                             ) : (
-                              <Play className="w-5 h-5 text-green-600" />
+                              <Play className="w-5 h-5 text-green-600 dark:text-green-300" />
                             )}
                           </button>
                           <button
@@ -1619,7 +1621,7 @@ export function ChannelsManager({
                             className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                             title="删除频道"
                           >
-                            <Trash2 className="w-5 h-5 text-red-600" />
+                            <Trash2 className="w-5 h-5 text-red-600 dark:text-red-300" />
                           </button>
                         </div>
                       </div>
@@ -1673,7 +1675,7 @@ export function ChannelsManager({
               );
             })
           ) : (
-            <div className="py-6 text-center text-black/60">{channels.length ? "没有匹配的频道" : "暂无频道"}</div>
+            <div className="py-6 text-center text-black/60 dark:text-slate-400">{channels.length ? "没有匹配的频道" : "暂无频道"}</div>
           )}
         </div>
       </div>

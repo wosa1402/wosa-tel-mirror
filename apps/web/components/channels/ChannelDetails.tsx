@@ -687,22 +687,22 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                     ) : null}
                   </>
                 ) : (
-                  <div className="mt-1 text-black/60">-</div>
+                  <div className="mt-1 text-black/60 dark:text-slate-400">-</div>
                 )}
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <div className="text-black/60">同步</div>
+                  <div className="text-black/60 dark:text-slate-300">同步</div>
                   <div className="mt-1">
                     status={channel.syncStatus} · lastSyncAt={formatTime(channel.lastSyncAt)}
                   </div>
-                  <div className="mt-1 text-xs text-black/60">lastMessageId={channel.lastMessageId ?? "-"}</div>
+                  <div className="mt-1 text-xs text-black/60 dark:text-slate-400">lastMessageId={channel.lastMessageId ?? "-"}</div>
                   {channel.syncStatus === "error" && channel.lastErrorEvent ? (
-                    <div className="mt-2 text-xs text-red-700 whitespace-pre-wrap">
+                    <div className="mt-2 text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">
                       最近错误（{formatTime(channel.lastErrorEvent.createdAt)}）：{truncateText(channel.lastErrorEvent.message, 180)}
                     </div>
                   ) : channel.lastEvent ? (
-                    <div className="mt-2 text-xs text-black/60 whitespace-pre-wrap">
+                    <div className="mt-2 text-xs text-black/60 dark:text-slate-400 whitespace-pre-wrap">
                       最近事件（{channel.lastEvent.level} · {formatTime(channel.lastEvent.createdAt)}）：{truncateText(channel.lastEvent.message, 180)}
                     </div>
                   ) : null}
@@ -710,7 +710,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                     <div className="mt-1 text-xs">
                       <a
                         href={`/events?sourceChannelId=${encodeURIComponent(channel.id)}&level=error`}
-                        className="text-blue-700 hover:underline"
+                        className="text-blue-700 hover:underline dark:text-blue-300"
                       >
                         查看错误事件
                       </a>
@@ -722,15 +722,15 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                         type="button"
                         onClick={recoverChannelSyncStatus}
                         disabled={loading}
-                        className="inline-flex h-9 items-center justify-center rounded-md border border-red-200 bg-red-50 px-3 text-sm text-red-800 hover:bg-red-100 disabled:opacity-50"
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-red-200 bg-red-50 px-3 text-sm text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15"
                       >
                         恢复（重新尝试）
                       </button>
                     </div>
                   ) : null}
                 </div>
-	                <div>
-	                  <div className="text-black/60">策略</div>
+                <div>
+                  <div className="text-black/60 dark:text-slate-300">策略</div>
 	                  <div className="mt-1">
 	                    mode={channel.mirrorMode ?? "-"} · protected={channel.isProtected ? "yes" : "no"} · active=
 	                    {channel.isActive ? "yes" : "no"} · priority={channel.priority ?? 0} · filter=
@@ -738,7 +738,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 	                    {(channel.groupName ?? "").trim() ? channel.groupName.trim() : "未分组"}
 	                  </div>
 	                  {channel.isProtected ? (
-                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                       提示：该源频道开启了“保护内容/禁止转发”，Telegram 会阻止转发/备份，所以镜像频道里可能看不到新消息。
                       你可以去 /settings 勾选“跳过禁止转发的频道消息”，让任务继续跑但把这些消息标记为 skipped；或者取消勾选，让任务在遇到该限制时暂停。
                     </div>
@@ -751,7 +751,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
               <div className="font-medium">分组与优先级</div>
               <div className="mt-2 flex flex-wrap items-end gap-3">
                 <div>
-                  <div className="text-xs text-black/60">分组（空=未分组）</div>
+                  <div className="text-xs text-black/60 dark:text-slate-400">分组（空=未分组）</div>
                   <input
                     type="text"
                     value={groupNameDraft}
@@ -773,7 +773,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                 </button>
 
                 <div>
-                  <div className="text-xs text-black/60">优先级（-100~100）</div>
+                  <div className="text-xs text-black/60 dark:text-slate-400">优先级（-100~100）</div>
                   <input
                     type="number"
                     value={priorityDraft}
@@ -800,7 +800,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   保存优先级
                 </button>
               </div>
-              <div className="mt-2 text-xs text-black/60">
+              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
                 提示：优先级越大，mirror-service 越倾向先处理这个频道的 pending 任务（比如设 10）。
               </div>
             </div>
@@ -831,7 +831,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   保存镜像方式
                 </button>
               </div>
-	              <div className="mt-2 text-xs text-black/60">
+	              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
 	                提示：修改后只影响“之后同步”的消息；已经备份到镜像频道里的历史消息不会自动重发/重排。
 	              </div>
 	            </div>
@@ -840,7 +840,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
               <div className="font-medium">广告过滤（该频道）</div>
               <div className="mt-2 flex flex-wrap items-end gap-3">
                 <div>
-                  <div className="text-xs text-black/60">模式</div>
+                  <div className="text-xs text-black/60 dark:text-slate-400">模式</div>
                   <div className="mt-1 min-w-[260px]">
                     <Select
                       value={messageFilterModeDraft}
@@ -875,7 +875,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 
               {messageFilterModeDraft === "custom" ? (
                 <div className="mt-3">
-                  <div className="text-xs text-black/60">关键词（建议每行一个）</div>
+                  <div className="text-xs text-black/60 dark:text-slate-400">关键词（建议每行一个）</div>
                   <textarea
                     value={messageFilterKeywordsDraft}
                     onChange={(e) => {
@@ -889,7 +889,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                 </div>
               ) : null}
 
-              <div className="mt-2 text-xs text-black/60">
+              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
                 说明：命中关键词的消息会被跳过（skipped=filtered），不会发送到镜像频道。
               </div>
             </div>
@@ -917,7 +917,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                 type="button"
                 onClick={deleteChannel}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15"
               >
                 {loading ? "处理中..." : "删除频道"}
               </button>
@@ -929,13 +929,15 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             <div className="mt-4 space-y-3 text-sm">
               <div>
                 resolve: {channel.tasks.resolve?.status ?? "-"}{" "}
-                {channel.tasks.resolve?.lastError ? <span className="text-red-700">· {channel.tasks.resolve.lastError}</span> : null}
+                {channel.tasks.resolve?.lastError ? (
+                  <span className="text-red-700 dark:text-red-200">· {channel.tasks.resolve.lastError}</span>
+                ) : null}
                 {renderTaskActions(channel.tasks.resolve)}
               </div>
 	              <div>
 	                history_full: {channel.tasks.history_full?.status ?? "-"}
 	                {channel.tasks.history_full ? (
-	                  <span className="text-black/60">
+	                  <span className="text-black/60 dark:text-slate-400">
 	                    {" "}
 	                    · progress={channel.tasks.history_full.progressCurrent ?? 0}/{channel.tasks.history_full.progressTotal ?? "-"} · lastId=
 	                    {channel.tasks.history_full.lastProcessedId ?? "-"}
@@ -954,9 +956,9 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 	                      );
 	                      return (
 	                        <div className="mt-2 max-w-sm">
-	                          <div className="h-2 w-full overflow-hidden rounded bg-black/10">
+	                          <div className="h-2 w-full overflow-hidden rounded bg-black/10 dark:bg-white/10">
 	                            <div
-	                              className={`h-full ${pct == null ? "bg-black/30 animate-pulse" : "bg-black/40"}`}
+	                              className={`h-full ${pct == null ? "bg-black/30 animate-pulse dark:bg-white/30" : "bg-black/40 dark:bg-white/40"}`}
 	                              style={{ width: `${pct ?? 33}%` }}
 	                            />
 	                          </div>
@@ -965,13 +967,15 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 	                    })()
 	                  : null}
 	                {channel.tasks.history_full?.lastError ? (
-	                  <div className="mt-1 text-xs text-red-700 whitespace-pre-wrap">{channel.tasks.history_full.lastError}</div>
+	                  <div className="mt-1 text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{channel.tasks.history_full.lastError}</div>
 	                ) : null}
 	                {renderTaskActions(channel.tasks.history_full)}
 	              </div>
               <div>
                 realtime: {channel.tasks.realtime?.status ?? "-"}{" "}
-                {channel.tasks.realtime?.lastError ? <span className="text-red-700">· {channel.tasks.realtime.lastError}</span> : null}
+                {channel.tasks.realtime?.lastError ? (
+                  <span className="text-red-700 dark:text-red-200">· {channel.tasks.realtime.lastError}</span>
+                ) : null}
                 {renderTaskActions(channel.tasks.realtime)}
               </div>
             </div>
@@ -981,27 +985,27 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             <h2 className="text-base font-semibold">消息统计</h2>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">total</div>
+                <div className="text-black/60 dark:text-slate-400">total</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.total}</div>
               </div>
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">success</div>
+                <div className="text-black/60 dark:text-slate-400">success</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.success}</div>
               </div>
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">pending</div>
+                <div className="text-black/60 dark:text-slate-400">pending</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.pending}</div>
               </div>
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">failed</div>
+                <div className="text-black/60 dark:text-slate-400">failed</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.failed}</div>
               </div>
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">skipped</div>
+                <div className="text-black/60 dark:text-slate-400">skipped</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.skipped}</div>
               </div>
               <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
-                <div className="text-black/60">skipped protected</div>
+                <div className="text-black/60 dark:text-slate-400">skipped protected</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.skippedProtectedContent}</div>
               </div>
             </div>
