@@ -7,9 +7,14 @@ import { StringSession } from "telegram/sessions";
 import { getInputMedia } from "telegram/Utils";
 import { decrypt } from "./utils/crypto";
 import { loadEnv } from "./utils/env";
+import { setupFileLogging } from "./utils/file-logging";
 import { sleep } from "./utils/sleep";
 
 loadEnv();
+const fileLogging = setupFileLogging();
+if (fileLogging) {
+  console.log(`file logging enabled: ${fileLogging.filePath}`);
+}
 
 const originalLinkCommentKeys = new Set<string>();
 const autoChannelAdminKeys = new Set<string>();

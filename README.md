@@ -55,6 +55,7 @@ cp .env.example .env
 
 可选：
 - `DATABASE_URL_LISTEN`：用于 LISTEN/NOTIFY（更好的实时推送）。如果使用 Supabase pooler（6543 端口），建议提供一个直连（5432 端口）的连接串。
+- `MIRROR_LOG_FILE`：把 mirror-service 的日志同时写入文件（默认只输出到 stdout）。例如 `./logs/mirror-service.log`。
 
 ### 2) 安装依赖 + 迁移数据库
 
@@ -161,6 +162,7 @@ pnpm -C apps/web build
 通常是 mirror-service 没跑起来或没拿到 session：
 - 去首页看“同步服务”是不是“在线”
 - 去 `/events` 看有没有关键报错
+- 如果你配置了 `MIRROR_LOG_FILE`，也可以去 `/logs` 看 mirror-service 的运行日志（更详细）
 - 确认已经在 Web 首页登录过 Telegram（session 会写入 DB）
 
 ### 2) 为什么提示受保护/禁止转发？
@@ -174,6 +176,15 @@ pnpm -C apps/web build
 ```bash
 pnpm db:migrate
 ```
+
+### 4) 我怎么知道“卡住/两小时没同步”的具体原因？
+先确认：源频道这两小时内是否真的有新消息（如果没有，新“备份时间”不变化是正常的）。
+
+如果源频道确实有新消息但没同步，按这个顺序排查：
+- `/`：看左侧底部“同步服务”是否在线（离线就重启 mirror-service）
+- `/tasks`：看该频道是否有 `running/pending/paused/failed` 任务，`paused` 会显示 `lastError`
+- `/events`：看最近的 warn/error（关键事件）
+- `/logs`：如果配置了 `MIRROR_LOG_FILE`，这里能看到 mirror-service 终端级别日志（最直观）
 
 ---
 

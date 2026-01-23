@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Activity, Home, ListTodo, MessageSquare, Radio, Send, Settings } from "lucide-react";
+import { Activity, FileText, Home, ListTodo, MessageSquare, Radio, Send, Settings } from "lucide-react";
 
 type NavItem = { name: string; href: string };
 
@@ -20,6 +20,7 @@ const navigation: Array<NavItem & { icon: React.ComponentType<{ className?: stri
   { name: "消息浏览", href: "/messages", icon: MessageSquare },
   { name: "任务管理", href: "/tasks", icon: ListTodo },
   { name: "事件中心", href: "/events", icon: Activity },
+  { name: "运行日志", href: "/logs", icon: FileText },
   { name: "系统设置", href: "/settings", icon: Settings },
 ];
 
@@ -81,7 +82,7 @@ export function Sidebar() {
   }, [status]);
 
   return (
-    <aside className="w-72 glass-panel border-r border-white/20 dark:border-white/10 flex flex-col">
+    <aside className="w-72 shrink-0 glass-panel border-r border-white/20 dark:border-white/10 flex flex-col sticky top-0 h-screen">
       <div className="p-8">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -96,7 +97,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-4 space-y-1">
         {navigation.map((item) => {
           const active = isActivePath(pathname, item.href);
           const Icon = item.icon;
