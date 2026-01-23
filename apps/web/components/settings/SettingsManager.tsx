@@ -311,7 +311,7 @@ export function SettingsManager() {
 
       <div className="ui-card">
         <h2 className="ui-section-title">Telegram Session</h2>
-        <div className="mt-3 text-sm text-gray-700">
+        <div className="mt-3 text-sm text-gray-700 dark:text-slate-300">
           状态：{telegramSessionSet == null ? "-" : telegramSessionSet ? "已设置" : "未设置"}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -336,7 +336,7 @@ export function SettingsManager() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="ui-section-title">同步策略</h2>
-            <p className="mt-1 text-sm text-gray-600">部分配置会影响新建频道的默认行为。</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">部分配置会影响新建频道的默认行为。</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -401,7 +401,7 @@ export function SettingsManager() {
                   type="number"
                   value={settings.max_file_size_mb}
                   onChange={(e) => update("max_file_size_mb", Number.parseInt(e.target.value, 10) || 0)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
               <div className="flex items-end">
@@ -419,7 +419,7 @@ export function SettingsManager() {
                   type="number"
                   value={settings.max_retry_count}
                   onChange={(e) => update("max_retry_count", Number.parseInt(e.target.value, 10) || 0)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
               <div>
@@ -428,7 +428,7 @@ export function SettingsManager() {
                   type="number"
                   value={settings.retry_interval_sec}
                   onChange={(e) => update("retry_interval_sec", Number.parseInt(e.target.value, 10) || 0)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
               <div className="flex items-end">
@@ -444,7 +444,7 @@ export function SettingsManager() {
                   type="number"
                   value={settings.mirror_interval_ms}
                   onChange={(e) => update("mirror_interval_ms", Number.parseInt(e.target.value, 10) || 0)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
               <div>
@@ -453,7 +453,7 @@ export function SettingsManager() {
                   type="number"
                   value={settings.concurrent_mirrors}
                   onChange={(e) => update("concurrent_mirrors", Math.max(1, Number.parseInt(e.target.value, 10) || 1))}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
             </div>
@@ -467,7 +467,7 @@ export function SettingsManager() {
                 <input
                   value={settings.auto_channel_prefix}
                   onChange={(e) => update("auto_channel_prefix", e.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                  className="ui-input mt-1"
                 />
               </div>
               <div className="flex items-end">
@@ -484,9 +484,9 @@ export function SettingsManager() {
                 value={settings.auto_channel_admins}
                 onChange={(e) => update("auto_channel_admins", e.target.value)}
                 placeholder="@username 或 用户id，多个用空格/逗号分隔"
-                className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                className="ui-input mt-1"
               />
-              <div className="mt-2 text-xs text-black/50">
+              <div className="mt-2 text-xs text-black/50 dark:text-slate-400">
                 说明：只对“自动创建的镜像频道/评论群”生效。保存后，新创建的频道会尝试邀请这些用户，并授予管理员全部权限（包含“任命管理员”）。
                 如果对方开启了隐私限制（不允许被拉进频道/群），Telegram 可能会拒绝，此时会在“事件中心”里看到提示。
               </div>
@@ -495,7 +495,7 @@ export function SettingsManager() {
 
           <div>
             <h3 className="text-sm font-semibold">编辑/删除（仅记录到数据库）</h3>
-            <p className="mt-1 text-xs text-black/50">开启后会记录源消息的编辑/撤回标记用于 Web 展示，不会修改镜像频道的备份消息。</p>
+            <p className="mt-1 text-xs text-black/50 dark:text-slate-400">开启后会记录源消息的编辑/撤回标记用于 Web 展示，不会修改镜像频道的备份消息。</p>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <Checkbox
                 label="同步编辑"
@@ -517,10 +517,10 @@ export function SettingsManager() {
 
           <div>
             <h3 className="text-sm font-semibold">广告/垃圾消息过滤（可选）</h3>
-            <p className="mt-1 text-xs text-black/50">
+            <p className="mt-1 text-xs text-black/50 dark:text-slate-400">
               命中关键词的消息会被“跳过”，不会发送到镜像频道；在 Messages 里会显示为 skipped（filtered）。
             </p>
-            <p className="mt-1 text-xs text-black/50">
+            <p className="mt-1 text-xs text-black/50 dark:text-slate-400">
               提示：如果你只想对某个频道生效/或想对某个频道单独配置，请去该频道的详情页设置“广告过滤（该频道）”。
             </p>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -538,9 +538,9 @@ export function SettingsManager() {
                   onChange={(e) => update("message_filter_keywords", e.target.value)}
                   rows={4}
                   placeholder={"每行一个关键词（也支持空格/逗号分隔）\n例如：\n广告\n加群\nVX"}
-                  className="mt-1 w-full rounded-md border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/30"
+                  className="ui-textarea mt-1"
                 />
-                <div className="mt-2 text-xs text-black/50">留空=不过滤；建议先放少量关键词，观察效果后再加。</div>
+                <div className="mt-2 text-xs text-black/50 dark:text-slate-400">留空=不过滤；建议先放少量关键词，观察效果后再加。</div>
               </div>
             </div>
           </div>
@@ -548,7 +548,7 @@ export function SettingsManager() {
           <div>
             <h3 className="text-sm font-semibold">访问控制</h3>
             <div className="mt-3">
-              <div className="text-sm text-black/70">
+              <div className="text-sm text-black/70 dark:text-slate-300">
                 状态：{accessPasswordSet == null ? "-" : accessPasswordSet ? "已启用" : "未启用"}
               </div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -559,7 +559,7 @@ export function SettingsManager() {
                     value={accessPasswordDraft}
                     onChange={(e) => setAccessPasswordDraft(e.target.value)}
                     placeholder="留空表示不修改"
-                    className="mt-1 h-10 w-full rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                    className="ui-input mt-1"
                   />
                 </div>
                 <div className="flex items-end gap-2">
@@ -567,7 +567,7 @@ export function SettingsManager() {
                     type="button"
                     onClick={updateAccessPassword}
                     disabled={!canUpdateAccessPassword}
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                    className="ui-btn ui-btn-secondary h-10 px-4 text-sm"
                   >
                     更新密码
                   </button>
@@ -575,29 +575,29 @@ export function SettingsManager() {
                     type="button"
                     onClick={disableAccessPassword}
                     disabled={saveDisabled || !accessPasswordSet}
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15"
                   >
                     禁用
                   </button>
                 </div>
               </div>
-              <div className="mt-2 text-xs text-black/50">启用后会强制校验访问密码（所有页面/API）。</div>
+              <div className="mt-2 text-xs text-black/50 dark:text-slate-400">启用后会强制校验访问密码（所有页面/API）。</div>
             </div>
           </div>
 
           <div>
             <h3 className="text-sm font-semibold">预设备份/恢复（可选）</h3>
-            <p className="mt-1 text-xs text-black/50">只备份/恢复你在各页面保存的“筛选预设”（不包含 Telegram session/访问密码）。</p>
+            <p className="mt-1 text-xs text-black/50 dark:text-slate-400">只备份/恢复你在各页面保存的“筛选预设”（不包含 Telegram session/访问密码）。</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <a
                 href="/api/export/presets"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm hover:bg-black/5"
+                className="ui-btn ui-btn-secondary h-10 px-4 text-sm"
               >
                 导出我的筛选预设（JSON）
               </a>
             </div>
 
-            <div className="mt-3 rounded-md border border-black/10 bg-white p-3">
+            <div className="mt-3 rounded-md border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-slate-900/40">
               <div className="text-sm font-medium">导入预设文件</div>
               <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end">
                 <div className="flex-1">
@@ -606,16 +606,18 @@ export function SettingsManager() {
                     accept="application/json"
                     disabled={saveDisabled}
                     onChange={(e) => loadPresetsFile(e.target.files?.[0] ?? null)}
-                    className="block w-full text-sm"
+                    className="block w-full text-sm dark:text-slate-200"
                   />
-                  <div className="mt-2 text-xs text-black/50">{presetsImportFileName ? `已选择：${presetsImportFileName}` : "未选择文件"}</div>
+                  <div className="mt-2 text-xs text-black/50 dark:text-slate-400">
+                    {presetsImportFileName ? `已选择：${presetsImportFileName}` : "未选择文件"}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => importPresets("merge")}
                     disabled={saveDisabled || !presetsImportText.trim()}
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                    className="ui-btn ui-btn-secondary h-10 px-4 text-sm"
                   >
                     合并导入
                   </button>
@@ -623,13 +625,13 @@ export function SettingsManager() {
                     type="button"
                     onClick={() => importPresets("replace")}
                     disabled={saveDisabled || !presetsImportText.trim()}
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15"
                   >
                     覆盖导入
                   </button>
                 </div>
               </div>
-              <div className="mt-2 text-xs text-black/50">
+              <div className="mt-2 text-xs text-black/50 dark:text-slate-400">
                 建议优先用“合并导入”。只有在你想把现有预设全部清空并换成导入文件时，才用“覆盖导入”。
               </div>
             </div>

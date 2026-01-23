@@ -16,6 +16,11 @@ const autoChannelAdminKeys = new Set<string>();
 const MIRROR_SERVICE_HEARTBEAT_KEY = "mirror_service_heartbeat";
 const MIRROR_SERVICE_HEARTBEAT_INTERVAL_MS = 30_000;
 const TASKS_NOTIFY_CHANNEL = "tg_back_sync_tasks_v1";
+const FLOOD_WAIT_AUTO_SLEEP_MAX_SEC = (() => {
+  const raw = Number.parseInt(process.env.MIRROR_FLOOD_WAIT_MAX_SEC ?? "600", 10);
+  if (!Number.isFinite(raw) || raw <= 0) return 600;
+  return Math.min(raw, 3600);
+})();
 
 type SyncEventLevel = (typeof schema.eventLevelEnum.enumValues)[number];
 
@@ -585,11 +590,13 @@ function getTelegramErrorMessage(error: unknown): string | undefined {
 }
 
 function parseFloodWaitSeconds(error: unknown): number | null {
-  const msg = getTelegramErrorMessage(error);
+  const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : "");
   if (!msg) return null;
-  const m = msg.match(/^FLOOD_WAIT_(\d+)$/);
-  if (!m) return null;
-  return Number.parseInt(m[1] ?? "", 10);
+  const m1 = msg.match(/^FLOOD_WAIT_(\d+)$/);
+  if (m1) return Number.parseInt(m1[1] ?? "", 10);
+  const m2 = msg.match(/A wait of (\d+) seconds is required/i);
+  if (m2) return Number.parseInt(m2[1] ?? "", 10);
+  return null;
 }
 
 function isRetryableCommentThreadError(error: unknown): boolean {
@@ -630,6 +637,28 @@ function collectNewMessagesFromUpdatesResult(result: unknown): Api.Message[] {
   }
 
   return [...map.values()].sort((a, b) => a.id - b.id);
+}
+
+function collectMessageIdsByRandomIdFromUpdatesResult(result: unknown): Map<string, number> {
+  const updates: unknown[] = [];
+  if (result instanceof Api.UpdateShort) {
+    updates.push(result.update);
+  } else if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+    updates.push(...result.updates);
+  } else {
+    return new Map();
+  }
+
+  const map = new Map<string, number>();
+  for (const update of updates) {
+    if (!(update instanceof Api.UpdateMessageID)) continue;
+    const randomId = toBigIntOrNull((update as any).randomId);
+    if (!randomId) continue;
+    if (!update.id) continue;
+    map.set(randomId.toString(), update.id);
+  }
+
+  return map;
 }
 
 function mediaHasSpoiler(media: unknown): boolean {
@@ -698,7 +727,7 @@ async function ensureMirrorMessageSpoiler(
     await editOnce();
   } catch (error: unknown) {
     const waitSeconds = parseFloodWaitSeconds(error);
-    if (waitSeconds && waitSeconds <= 60) {
+    if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
       await sleep(waitSeconds * 1000);
       try {
         await editOnce();
@@ -754,7 +783,7 @@ async function ensureOriginalLinkComment(
     } catch (error: unknown) {
       lastError = error;
       const waitSeconds = parseFloodWaitSeconds(error);
-      if (waitSeconds && waitSeconds <= 60) {
+      if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
         await sleep(waitSeconds * 1000);
         continue;
       }
@@ -1138,7 +1167,7 @@ async function runChannelHealthCheck(client: TelegramClient, channel: HealthChec
     result = await invokeOnce();
   } catch (error: unknown) {
     const waitSeconds = parseFloodWaitSeconds(error);
-    if (waitSeconds && waitSeconds <= 60) {
+    if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
       await sleep(waitSeconds * 1000);
       result = await invokeOnce();
     } else {
@@ -1261,7 +1290,7 @@ async function syncCommentsForPost(
         await sendOnce();
       } catch (error: unknown) {
         const waitSeconds = parseFloodWaitSeconds(error);
-        if (waitSeconds && waitSeconds <= 60) {
+        if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
           try {
             await sendOnce();
@@ -1309,7 +1338,7 @@ async function syncCommentsForPost(
         await sendOnce();
       } catch (error: unknown) {
         const waitSeconds = parseFloodWaitSeconds(error);
-        if (waitSeconds && waitSeconds <= 60) {
+        if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
           try {
             await sendOnce();
@@ -1374,30 +1403,49 @@ async function forwardMessagesAsCopy(
   const fromInput = await client.getInputEntity(fromPeer as any);
   const toInput = await client.getInputEntity(toPeer as any);
 
+  const randomIds = messageIds.map(() => generateRandomBigInt());
   const request = new Api.messages.ForwardMessages({
     fromPeer: fromInput as any,
     toPeer: toInput as any,
     id: messageIds,
-    randomId: messageIds.map(() => generateRandomBigInt()),
+    randomId: randomIds,
     dropAuthor: true,
   });
 
   const result = await client.invoke(request);
   const recovered = collectNewMessagesFromUpdatesResult(result);
-  if (recovered.length) {
-    if (recovered.length !== messageIds.length) {
-      console.warn(
-        `ForwardMessages recovered ${recovered.length}/${messageIds.length} message(s) from updates; mapping may be approximate.`,
-      );
-    }
-    const sliced = recovered.length > messageIds.length ? recovered.slice(recovered.length - messageIds.length) : recovered;
-    return messageIds.map((_, idx) => sliced[idx]);
-  }
+  const recoveredById = new Map<number, Api.Message>();
+  for (const msg of recovered) recoveredById.set(msg.id, msg);
 
-  const parsed = client._getResponseMessage(request as any, result as any, toInput as any);
-  if (Array.isArray(parsed)) return parsed.map((m) => (m instanceof Api.Message ? m : undefined));
-  if (parsed instanceof Api.Message) return [parsed];
-  return messageIds.map(() => undefined);
+  const idsByRandomId = collectMessageIdsByRandomIdFromUpdatesResult(result);
+
+  const fallback = (() => {
+    if (recovered.length) {
+      if (recovered.length !== messageIds.length) {
+        console.warn(
+          `ForwardMessages recovered ${recovered.length}/${messageIds.length} message(s) from updates; mapping may be approximate.`,
+        );
+      }
+      const sliced = recovered.length > messageIds.length ? recovered.slice(recovered.length - messageIds.length) : recovered;
+      return messageIds.map((_, idx) => sliced[idx]);
+    }
+
+    const parsed = client._getResponseMessage(request as any, result as any, toInput as any);
+    if (Array.isArray(parsed)) return parsed.map((m) => (m instanceof Api.Message ? m : undefined));
+    if (parsed instanceof Api.Message) return [parsed];
+    return messageIds.map(() => undefined);
+  })();
+
+  if (!idsByRandomId.size) return fallback;
+
+  const mapped = messageIds.map((_, idx) => {
+    const id = idsByRandomId.get(randomIds[idx]?.toString() ?? "");
+    if (!id) return undefined;
+    return recoveredById.get(id) ?? ({ id } as any as Api.Message);
+  });
+
+  if (!mapped.some(Boolean)) return fallback;
+  return messageIds.map((_, idx) => mapped[idx] ?? fallback[idx]);
 }
 
 async function getTelegramClient(): Promise<TelegramClient> {
@@ -1837,7 +1885,7 @@ async function ensureAutoChannelAdmins(
     } catch (error: unknown) {
       if (!isUserAlreadyParticipantError(error)) {
         const waitSeconds = parseFloodWaitSeconds(error);
-        if (waitSeconds && waitSeconds <= 60) {
+        if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
           try {
             await inviteOnce();
@@ -1883,7 +1931,7 @@ async function ensureAutoChannelAdmins(
       await logSyncEvent({ sourceChannelId, level: "info", message: msg });
     } catch (error: unknown) {
       const waitSeconds = parseFloodWaitSeconds(error);
-      if (waitSeconds && waitSeconds <= 60) {
+      if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
         await sleep(waitSeconds * 1000);
         try {
           await promoteOnce();
@@ -2465,13 +2513,86 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
         "history_full skip:filtered",
       );
     } else if (mode === "forward") {
-      try {
-        const forwarded = await forwardMessagesAsCopy(client, { fromPeer: sourceEntity, toPeer: mirrorEntity, messageIds });
+      const tryForwardOnce = async () =>
+        await forwardMessagesAsCopy(client, { fromPeer: sourceEntity, toPeer: mirrorEntity, messageIds });
+
+      let forwarded: (Api.Message | undefined)[] | null = null;
+      for (;;) {
+        try {
+          forwarded = await tryForwardOnce();
+          break;
+        } catch (error: unknown) {
+          const { skipReason } = classifyMirrorError(error);
+          if (skipReason) {
+            if (skipReason === "protected_content" && !reportedProtectedContent) {
+              reportedProtectedContent = true;
+              console.warn(
+                `source channel has protected content enabled; Telegram blocks forwarding. Messages will be marked skipped (or task paused if skip_protected_content=false) and will not appear in the mirror channel.`,
+              );
+              await logSyncEvent({
+                sourceChannelId: source.id,
+                level: "warn",
+                message: `protected content enabled; history_full forwarding blocked (taskId=${taskId})`,
+              });
+            }
+
+            if (skipReason === "protected_content" && !source.isProtected) {
+              try {
+                await db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id));
+                source.isProtected = true;
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
+              }
+            }
+
+            if (skipReason === "protected_content" && !mirrorBehavior.skipProtectedContent) {
+              const msg0 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+              await updateMessageMappingsByIds(
+                mappingIds,
+                { status: "failed", skipReason: "protected_content", errorMessage: msg0, mirroredAt: new Date() },
+                "history_full protected_content blocked",
+              );
+              await pauseTask(taskId, msg0, { progressCurrent, progressTotal, lastProcessedId });
+              return "paused";
+            }
+
+            await updateMessageMappingsByIds(
+              mappingIds,
+              { status: "skipped", skipReason, mirroredAt: new Date(), errorMessage: null },
+              `history_full skip:${skipReason}`,
+            );
+            forwarded = null;
+            break;
+          }
+
+          const waitSeconds = parseFloodWaitSeconds(error);
+          if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+            await sleep((waitSeconds + 1) * 1000);
+            if (!(await ensureActiveOrPause())) return "paused";
+            continue;
+          }
+
+          const msg1 = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
+          await updateMessageMappingsByIds(
+            mappingIds,
+            { status: "failed", errorMessage: msg1, mirroredAt: new Date() },
+            "history_full forward failed",
+          );
+          await pauseTask(taskId, msg1, { progressCurrent, progressTotal, lastProcessedId });
+          return "paused";
+        }
+      }
+
+      if (forwarded) {
         await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
 
-	        for (let i = 0; i < items.length; i += 1) {
-	          const mirrorMessageId = forwarded[i]?.id ?? null;
-	          if (mirrorMessageId == null) {
+        let hasFailure = false;
+
+        for (let i = 0; i < items.length; i += 1) {
+          const mirrorMessageId = forwarded[i]?.id ?? null;
+          if (mirrorMessageId == null) {
+            hasFailure = true;
             await withDbRetry(
               () =>
                 db
@@ -2481,34 +2602,39 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
               `history_full mark failed (taskId=${taskId})`,
               { attempts: 3, baseDelayMs: 250 },
             );
-	          } else {
-	            await withDbRetry(
-	              () =>
-	                db
-	                  .update(schema.messageMappings)
-	                  .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
-	                  .where(eq(schema.messageMappings.id, items[i]!.mappingId)),
-	              `history_full mark success (taskId=${taskId})`,
-	              { attempts: 3, baseDelayMs: 250 },
-	            );
-	          }
-	        }
+          } else {
+            await withDbRetry(
+              () =>
+                db
+                  .update(schema.messageMappings)
+                  .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
+                  .where(eq(schema.messageMappings.id, items[i]!.mappingId)),
+              `history_full mark success (taskId=${taskId})`,
+              { attempts: 3, baseDelayMs: 250 },
+            );
+          }
+        }
 
-	        for (let i = 0; i < items.length; i += 1) {
-	          const mirrorMessageId = forwarded[i]?.id ?? null;
-	          if (!mirrorMessageId) continue;
-	          await ensureMirrorMessageSpoiler(client, {
-	            mirrorPeer: mirrorEntity,
-	            mirrorMessageId,
-	            sourceMessage: items[i]!.msg,
-	            mirroredMessage: forwarded[i] ?? null,
-	          });
-	        }
-	
-	        await withDbRetry(
-	          () =>
-	            db
-	              .update(schema.sourceChannels)
+        if (hasFailure) {
+          await pauseTask(taskId, "missing forwarded message mapping", { progressCurrent, progressTotal, lastProcessedId });
+          return "paused";
+        }
+
+        for (let i = 0; i < items.length; i += 1) {
+          const mirrorMessageId = forwarded[i]?.id ?? null;
+          if (!mirrorMessageId) continue;
+          await ensureMirrorMessageSpoiler(client, {
+            mirrorPeer: mirrorEntity,
+            mirrorMessageId,
+            sourceMessage: items[i]!.msg,
+            mirroredMessage: forwarded[i] ?? null,
+          });
+        }
+
+        await withDbRetry(
+          () =>
+            db
+              .update(schema.sourceChannels)
               .set({ lastSyncAt: new Date(), lastMessageId: messageIds[messageIds.length - 1] })
               .where(eq(schema.sourceChannels.id, source.id)),
           `history_full update source last_sync_at (taskId=${taskId})`,
@@ -2531,128 +2657,15 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
             if (!mirrorPostId) continue;
             if (!items[i]!.msg.post) continue;
             if (!(replies instanceof Api.MessageReplies) || replies.replies <= 0) continue;
-	            await syncCommentsForPost(client, {
-	              sourceEntity,
-	              mirrorEntity,
-	              mirrorChannelId: mirror.id,
-	              sourceChannel: source,
-	              sourcePostId: items[i]!.msg.id,
-	              mirrorPostId,
-	              maxComments: maxCommentsPerPost,
-	            });
-          }
-        }
-      } catch (error: unknown) {
-        const { skipReason } = classifyMirrorError(error);
-        if (skipReason) {
-          if (skipReason === "protected_content" && !reportedProtectedContent) {
-            reportedProtectedContent = true;
-            console.warn(
-              `source channel has protected content enabled; Telegram blocks forwarding. Messages will be marked skipped (or task paused if skip_protected_content=false) and will not appear in the mirror channel.`,
-            );
-            await logSyncEvent({
-              sourceChannelId: source.id,
-              level: "warn",
-              message: `protected content enabled; history_full forwarding blocked (taskId=${taskId})`,
+            await syncCommentsForPost(client, {
+              sourceEntity,
+              mirrorEntity,
+              mirrorChannelId: mirror.id,
+              sourceChannel: source,
+              sourcePostId: items[i]!.msg.id,
+              mirrorPostId,
+              maxComments: maxCommentsPerPost,
             });
-          }
-
-          if (skipReason === "protected_content" && !source.isProtected) {
-            try {
-              await db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id));
-              source.isProtected = true;
-            } catch (e: unknown) {
-              const msg = e instanceof Error ? e.message : String(e);
-              console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
-            }
-          }
-
-          if (skipReason === "protected_content" && !mirrorBehavior.skipProtectedContent) {
-            const msg0 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-            await updateMessageMappingsByIds(
-              mappingIds,
-              { status: "failed", skipReason: "protected_content", errorMessage: msg0, mirroredAt: new Date() },
-              "history_full protected_content blocked",
-            );
-            await pauseTask(taskId, msg0, { progressCurrent, progressTotal, lastProcessedId });
-            return "paused";
-          }
-
-          await updateMessageMappingsByIds(
-            mappingIds,
-            { status: "skipped", skipReason, mirroredAt: new Date(), errorMessage: null },
-            `history_full skip:${skipReason}`,
-          );
-        } else {
-          const waitSeconds = parseFloodWaitSeconds(error);
-	          if (waitSeconds && waitSeconds <= 60) {
-	            await sleep(waitSeconds * 1000);
-	            try {
-	              const forwarded = await forwardMessagesAsCopy(client, { fromPeer: sourceEntity, toPeer: mirrorEntity, messageIds });
-	              await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
-	              for (let i = 0; i < items.length; i += 1) {
-	                const mirrorMessageId = forwarded[i]?.id ?? null;
-	                if (mirrorMessageId == null) {
-	                  await withDbRetry(
-                    () =>
-                      db
-                        .update(schema.messageMappings)
-                        .set({ status: "failed", errorMessage: "missing forwarded message mapping", mirroredAt: new Date() })
-                        .where(eq(schema.messageMappings.id, items[i]!.mappingId)),
-                    `history_full mark failed (taskId=${taskId})`,
-                    { attempts: 3, baseDelayMs: 250 },
-                  );
-                } else {
-                  await withDbRetry(
-                    () =>
-                      db
-                        .update(schema.messageMappings)
-                        .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
-                        .where(eq(schema.messageMappings.id, items[i]!.mappingId)),
-                    `history_full mark success (taskId=${taskId})`,
-                    { attempts: 3, baseDelayMs: 250 },
-	                  );
-	                }
-	              }
-
-	              for (let i = 0; i < items.length; i += 1) {
-	                const mirrorMessageId = forwarded[i]?.id ?? null;
-	                if (!mirrorMessageId) continue;
-	                await ensureMirrorMessageSpoiler(client, {
-	                  mirrorPeer: mirrorEntity,
-	                  mirrorMessageId,
-	                  sourceMessage: items[i]!.msg,
-	                  mirroredMessage: forwarded[i] ?? null,
-	                });
-	              }
-	              await withDbRetry(
-	                () =>
-	                  db
-	                    .update(schema.sourceChannels)
-                    .set({ lastSyncAt: new Date(), lastMessageId: messageIds[messageIds.length - 1] })
-                    .where(eq(schema.sourceChannels.id, source.id)),
-                `history_full update source last_sync_at (taskId=${taskId})`,
-                { attempts: 3, baseDelayMs: 250 },
-              );
-            } catch (error2: unknown) {
-              const msg2 = error2 instanceof Error ? error2.message : getTelegramErrorMessage(error2) ?? String(error2);
-              await updateMessageMappingsByIds(
-                mappingIds,
-                { status: "failed", errorMessage: msg2, mirroredAt: new Date() },
-                "history_full retry failed",
-              );
-            }
-          } else if (waitSeconds && waitSeconds > 60) {
-            const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-            await pauseTask(taskId, msg1, { progressCurrent, progressTotal, lastProcessedId });
-            return "paused";
-          } else {
-            const msg1 = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
-            await updateMessageMappingsByIds(
-              mappingIds,
-              { status: "failed", errorMessage: msg1, mirroredAt: new Date() },
-              "history_full forward failed",
-            );
           }
         }
       }
@@ -2720,10 +2733,10 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
 	              maxComments: maxCommentsPerPost,
 	            });
           }
-        } catch (error: unknown) {
-          const { skipReason } = classifyMirrorError(error);
-          if (skipReason) {
-            await withDbRetry(
+	        } catch (error: unknown) {
+	          const { skipReason } = classifyMirrorError(error);
+	          if (skipReason) {
+	            await withDbRetry(
               () =>
                 db
                   .update(schema.messageMappings)
@@ -2732,10 +2745,11 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
               `history_full copy mark skipped (taskId=${taskId})`,
               { attempts: 3, baseDelayMs: 250 },
             );
-          } else {
-            const waitSeconds = parseFloodWaitSeconds(error);
-	            if (waitSeconds && waitSeconds <= 60) {
-	              await sleep(waitSeconds * 1000);
+	          } else {
+	            const waitSeconds = parseFloodWaitSeconds(error);
+	            if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+	              await sleep((waitSeconds + 1) * 1000);
+	              if (!(await ensureActiveOrPause())) return "paused";
 	              try {
 	                const sent = await client.sendMessage(mirrorEntity, { message: content });
 	                await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
@@ -2743,43 +2757,43 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
 	                  () =>
 	                    db
 	                      .update(schema.messageMappings)
-                      .set({ status: "success", mirrorMessageId: sent?.id ?? null, mirroredAt: new Date(), errorMessage: null })
-                      .where(eq(schema.messageMappings.id, item.mappingId)),
-                  `history_full copy mark success (taskId=${taskId})`,
-                  { attempts: 3, baseDelayMs: 250 },
-                );
-              } catch (error2: unknown) {
-                const msg2 = error2 instanceof Error ? error2.message : getTelegramErrorMessage(error2) ?? String(error2);
-                await withDbRetry(
-                  () =>
-                    db
-                      .update(schema.messageMappings)
-                      .set({ status: "failed", errorMessage: msg2, mirroredAt: new Date() })
-                      .where(eq(schema.messageMappings.id, item.mappingId)),
-                  `history_full copy mark failed (taskId=${taskId})`,
-                  { attempts: 3, baseDelayMs: 250 },
-                );
-              }
-            } else if (waitSeconds && waitSeconds > 60) {
-              const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-              await pauseTask(taskId, msg1, { progressCurrent, progressTotal, lastProcessedId });
-              return "paused";
-            } else {
-              const msg1 = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
-              await withDbRetry(
-                () =>
-                  db
-                    .update(schema.messageMappings)
-                    .set({ status: "failed", errorMessage: msg1, mirroredAt: new Date() })
-                    .where(eq(schema.messageMappings.id, item.mappingId)),
-                `history_full copy mark failed (taskId=${taskId})`,
-                { attempts: 3, baseDelayMs: 250 },
-              );
-            }
-          }
-        }
+	                      .set({ status: "success", mirrorMessageId: sent?.id ?? null, mirroredAt: new Date(), errorMessage: null })
+	                      .where(eq(schema.messageMappings.id, item.mappingId)),
+	                  `history_full copy mark success (taskId=${taskId})`,
+	                  { attempts: 3, baseDelayMs: 250 },
+	                );
+	              } catch (error2: unknown) {
+	                const msg2 = error2 instanceof Error ? error2.message : getTelegramErrorMessage(error2) ?? String(error2);
+	                await withDbRetry(
+	                  () =>
+	                    db
+	                      .update(schema.messageMappings)
+	                      .set({ status: "failed", errorMessage: msg2, mirroredAt: new Date() })
+	                      .where(eq(schema.messageMappings.id, item.mappingId)),
+	                  `history_full copy mark failed (taskId=${taskId})`,
+	                  { attempts: 3, baseDelayMs: 250 },
+	                );
+	                await pauseTask(taskId, msg2, { progressCurrent, progressTotal, lastProcessedId });
+	                return "paused";
+	              }
+	            } else {
+	              const msg1 = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
+	              await withDbRetry(
+	                () =>
+	                  db
+	                    .update(schema.messageMappings)
+	                    .set({ status: "failed", errorMessage: msg1, mirroredAt: new Date() })
+	                    .where(eq(schema.messageMappings.id, item.mappingId)),
+	                `history_full copy mark failed (taskId=${taskId})`,
+	                { attempts: 3, baseDelayMs: 250 },
+	              );
+	              await pauseTask(taskId, msg1, { progressCurrent, progressTotal, lastProcessedId });
+	              return "paused";
+	            }
+	          }
+	        }
 
-        await advanceProgressFor(msg.id);
+	        await advanceProgressFor(msg.id);
       }
 
       return "ok";
@@ -3288,7 +3302,7 @@ async function processRetryFailedTask(client: TelegramClient, taskId: string, so
         }
 
         const waitSeconds = parseFloodWaitSeconds(error);
-        if (waitSeconds && waitSeconds <= 60) {
+        if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
           try {
             const forwarded = await tryForwardOnce();
@@ -3358,7 +3372,7 @@ async function processRetryFailedTask(client: TelegramClient, taskId: string, so
               }
             }
           }
-        } else if (waitSeconds && waitSeconds > 60) {
+        } else if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
           await pauseTask(taskId, msg1);
           return "paused";
@@ -3421,7 +3435,7 @@ async function processRetryFailedTask(client: TelegramClient, taskId: string, so
               .where(eq(schema.messageMappings.id, item.mappingId));
           } else {
             const waitSeconds = parseFloodWaitSeconds(error);
-            if (waitSeconds && waitSeconds <= 60) {
+            if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
               await sleep(waitSeconds * 1000);
               try {
                 const sent = await client.sendMessage(mirrorEntity as any, { message: content });
@@ -3445,7 +3459,7 @@ async function processRetryFailedTask(client: TelegramClient, taskId: string, so
                 const msg2 = error2 instanceof Error ? error2.message : getTelegramErrorMessage(error2) ?? String(error2);
                 await markRetryFailure(item, msg2);
               }
-            } else if (waitSeconds && waitSeconds > 60) {
+            } else if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
               const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
               await pauseTask(taskId, msg1);
               return "paused";
@@ -4029,7 +4043,7 @@ class RealtimeManager {
         }
 
         const waitSeconds = parseFloodWaitSeconds(error);
-        if (waitSeconds && waitSeconds <= 60) {
+        if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
 	          try {
 	            const forwarded = await forwardMessagesAsCopy(this.client, {
@@ -4093,6 +4107,11 @@ class RealtimeManager {
             );
             return;
           }
+        }
+        if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+          const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+          await pauseTask(taskId, msg1);
+          return;
         }
 
         const msg1 = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
@@ -4166,7 +4185,7 @@ class RealtimeManager {
               await sendOnce();
             } catch (error: unknown) {
               const waitSeconds = parseFloodWaitSeconds(error);
-              if (waitSeconds && waitSeconds <= 60) {
+              if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
                 await sleep(waitSeconds * 1000);
                 await sendOnce();
               } else {
@@ -4206,7 +4225,7 @@ class RealtimeManager {
               await sendOnce();
             } catch (error: unknown) {
               const waitSeconds = parseFloodWaitSeconds(error);
-              if (waitSeconds && waitSeconds <= 60) {
+              if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
                 await sleep(waitSeconds * 1000);
                 await sendOnce();
               } else {
@@ -4319,16 +4338,16 @@ class RealtimeManager {
                 }
               };
 
-              try {
+            try {
+              await sendOnce();
+            } catch (error: unknown) {
+              const waitSeconds = parseFloodWaitSeconds(error);
+              if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+                await sleep(waitSeconds * 1000);
                 await sendOnce();
-              } catch (error: unknown) {
-                const waitSeconds = parseFloodWaitSeconds(error);
-                if (waitSeconds && waitSeconds <= 60) {
-                  await sleep(waitSeconds * 1000);
-                  await sendOnce();
-                } else {
-                  throw error;
-                }
+              } else {
+                throw error;
+              }
               }
             } catch (error: unknown) {
               const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
@@ -4601,7 +4620,7 @@ class RealtimeManager {
             }
 
             const waitSeconds = parseFloodWaitSeconds(error);
-            if (waitSeconds && waitSeconds <= 60) {
+            if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
               await sleep(waitSeconds * 1000);
 	              try {
 	                const mirrorMessageId = await tryMirrorOnce();
@@ -4641,6 +4660,10 @@ class RealtimeManager {
               }
             }
 
+            if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+              const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+              await pauseTask(taskId, msg1);
+            }
             await markFailed(error);
           }
         } catch (error: unknown) {

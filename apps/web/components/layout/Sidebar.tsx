@@ -72,7 +72,7 @@ export function Sidebar() {
   }, []);
 
   const statusText = useMemo(() => {
-    if (!status) return { title: "同步服务", sub: "状态未知", dot: "bg-gray-300" };
+    if (!status) return { title: "同步服务", sub: "状态未知", dot: "bg-gray-300 dark:bg-slate-600" };
     if (!status.online) return { title: "同步服务", sub: "离线", dot: "bg-red-500" };
     const lag = formatLag(status.lagSec);
     const hb = status.lastHeartbeatAt ? `last ${formatTime(status.lastHeartbeatAt)}` : "";
@@ -81,7 +81,7 @@ export function Sidebar() {
   }, [status]);
 
   return (
-    <aside className="w-72 glass-panel border-r border-white/20 flex flex-col">
+    <aside className="w-72 glass-panel border-r border-white/20 dark:border-white/10 flex flex-col">
       <div className="p-8">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -91,7 +91,7 @@ export function Sidebar() {
             <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               tg-back
             </div>
-            <div className="text-xs text-gray-500">Telegram 频道备份</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400">Telegram 频道备份</div>
           </div>
         </Link>
       </div>
@@ -108,7 +108,7 @@ export function Sidebar() {
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
                 active
                   ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30"
-                  : "text-gray-700 hover:bg-white/60",
+                  : "text-gray-700 hover:bg-white/60 dark:text-slate-200 dark:hover:bg-slate-800/60",
               )}
             >
               <Icon className="w-5 h-5" />
@@ -118,13 +118,13 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-6 border-t border-white/20">
+      <div className="p-6 border-t border-white/20 dark:border-white/10">
         <div className="glass-panel rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className={clsx("w-3 h-3 rounded-full", statusText.dot)} />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900">{statusText.title}</p>
-              <p className="text-xs text-gray-500 truncate">{statusText.sub}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{statusText.title}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{statusText.sub}</p>
             </div>
           </div>
         </div>

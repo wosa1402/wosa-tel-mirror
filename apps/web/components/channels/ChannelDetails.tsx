@@ -370,7 +370,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             type="button"
             onClick={() => updateTask(task.id, "resume")}
             disabled={loading}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5 disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
           >
             恢复
           </button>
@@ -379,7 +379,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             type="button"
             onClick={() => updateTask(task.id, "pause")}
             disabled={loading || task.status === "completed" || task.status === "failed"}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5 disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
           >
             暂停
           </button>
@@ -388,7 +388,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
           type="button"
           onClick={() => updateTask(task.id, "requeue")}
           disabled={loading || task.status === "running" || task.status === "paused"}
-          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5 disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
         >
           重排队
         </button>
@@ -396,7 +396,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
           type="button"
           onClick={() => updateTask(task.id, "restart")}
           disabled={loading || task.status === "running"}
-          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5 disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
         >
           重启
         </button>
@@ -571,7 +571,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               频道详情
             </h1>
-            <p className="mt-1 text-sm text-gray-600">{channel ? channel.name : channelId}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">{channel ? channel.name : channelId}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -628,16 +628,16 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             <h2 className="ui-section-title">基本信息</h2>
             <div className="mt-4 grid grid-cols-1 gap-4 text-sm">
               <div>
-                <div className="text-gray-600">源频道</div>
+                <div className="text-gray-600 dark:text-slate-300">源频道</div>
                 <div className="mt-1 font-medium">{channel.channelIdentifier}</div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                   telegramId={channel.telegramId ?? "-"} {channel.username ? `· @${channel.username}` : ""}
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                   members={channel.memberCount ?? "-"} · totalMessages={channel.totalMessages ?? "-"}
                 </div>
                 {channel.description ? (
-                  <div className="mt-2 text-xs whitespace-pre-wrap text-gray-600">{channel.description}</div>
+                  <div className="mt-2 text-xs whitespace-pre-wrap text-gray-600 dark:text-slate-300">{channel.description}</div>
                 ) : null}
                 {sourceChannelLink ? (
                   <div className="mt-2">
@@ -653,11 +653,11 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                 ) : null}
               </div>
               <div>
-                <div className="text-gray-600">镜像频道</div>
+                <div className="text-gray-600 dark:text-slate-300">镜像频道</div>
                 {channel.mirrorChannel ? (
                   <>
                     <div className="mt-1 font-medium">{channel.mirrorChannel.channelIdentifier}</div>
-                    <div className="mt-1 text-xs text-gray-600">
+                    <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                       telegramId={channel.mirrorChannel.telegramId ?? "-"}{" "}
                       {channel.mirrorChannel.username ? `· @${channel.mirrorChannel.username}` : ""}
                     </div>
@@ -679,7 +679,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                           href={channel.mirrorChannel.inviteLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5"
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                         >
                           打开邀请链接
                         </a>
@@ -747,7 +747,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
               </div>
             </div>
 
-            <div className="mt-4 rounded-md border border-black/10 p-4 text-sm">
+            <div className="mt-4 rounded-md border border-black/10 bg-white p-4 text-sm dark:border-white/10 dark:bg-white/5">
               <div className="font-medium">分组与优先级</div>
               <div className="mt-2 flex flex-wrap items-end gap-3">
                 <div>
@@ -760,14 +760,14 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                       setGroupNameDirty(true);
                     }}
                     placeholder="例如：重要/娱乐"
-                    className="mt-1 h-10 w-48 rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                    className="mt-1 h-10 w-48 rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:focus:border-white/20"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={saveGroupName}
                   disabled={loading || groupNameDraft.trim().slice(0, 50) === (channel.groupName ?? "")}
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   保存分组
                 </button>
@@ -781,7 +781,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                       setPriorityDraft(e.target.value);
                       setPriorityDirty(true);
                     }}
-                    className="mt-1 h-10 w-28 rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                    className="mt-1 h-10 w-28 rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:focus:border-white/20"
                   />
                 </div>
                 <button
@@ -795,7 +795,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                     const clamped = Math.max(-100, Math.min(100, Math.trunc(parsed)));
                     return clamped === (channel.priority ?? 0);
                   })()}
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   保存优先级
                 </button>
@@ -805,7 +805,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
               </div>
             </div>
 
-	            <div className="mt-4 rounded-md border border-black/10 p-4 text-sm">
+	            <div className="mt-4 rounded-md border border-black/10 bg-white p-4 text-sm dark:border-white/10 dark:bg-white/5">
 	              <div className="font-medium">镜像方式</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <div className="min-w-[220px]">
@@ -826,7 +826,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   type="button"
                   onClick={saveMirrorMode}
                   disabled={loading || !channel || mirrorModeDraft === (channel.mirrorMode ?? "forward")}
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   保存镜像方式
                 </button>
@@ -836,7 +836,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 	              </div>
 	            </div>
 
-            <div className="mt-4 rounded-md border border-black/10 p-4 text-sm">
+            <div className="mt-4 rounded-md border border-black/10 bg-white p-4 text-sm dark:border-white/10 dark:bg-white/5">
               <div className="font-medium">广告过滤（该频道）</div>
               <div className="mt-2 flex flex-wrap items-end gap-3">
                 <div>
@@ -867,7 +867,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                     (messageFilterModeDraft === (channel.messageFilterMode ?? "inherit") &&
                       messageFilterKeywordsDraft.trim() === (channel.messageFilterKeywords ?? "").trim())
                   }
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   保存过滤设置
                 </button>
@@ -884,7 +884,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                     }}
                     rows={4}
                     placeholder={"广告\n加群\nVX"}
-                    className="mt-1 w-full rounded-md border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/30"
+                    className="mt-1 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:focus:border-white/20"
                   />
                 </div>
               ) : null}
@@ -899,7 +899,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                 type="button"
                 onClick={toggleActive}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 {loading ? "处理中..." : channel.isActive ? "停用同步" : "启用同步"}
               </button>
@@ -908,7 +908,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   href={exportMessagesLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   导出消息(JSONL)
                 </a>
@@ -924,7 +924,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900/40">
             <h2 className="text-base font-semibold">任务与进度</h2>
             <div className="mt-4 space-y-3 text-sm">
               <div>
@@ -977,30 +977,30 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900/40">
             <h2 className="text-base font-semibold">消息统计</h2>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">total</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.total}</div>
               </div>
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">success</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.success}</div>
               </div>
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">pending</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.pending}</div>
               </div>
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">failed</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.failed}</div>
               </div>
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">skipped</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.skipped}</div>
               </div>
-              <div className="rounded-md border border-black/10 p-3">
+              <div className="rounded-md border border-black/10 p-3 dark:border-white/10">
                 <div className="text-black/60">skipped protected</div>
                 <div className="mt-1 text-lg font-semibold">{channel.messageStats.skippedProtectedContent}</div>
               </div>
@@ -1009,13 +1009,13 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
             <div className="mt-4 flex flex-wrap gap-2">
               <a
                 href={`/messages?sourceChannelId=${encodeURIComponent(channel.id)}&status=failed`}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 查看 failed
               </a>
               <a
                 href={`/messages?sourceChannelId=${encodeURIComponent(channel.id)}&status=skipped`}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 查看 skipped
               </a>
@@ -1029,7 +1029,7 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   channel.tasks.history_full?.status === "pending" ||
                   channel.tasks.history_full?.status === "running"
                 }
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 重试 failed（创建任务）
               </button>

@@ -88,15 +88,15 @@ const messageIconMap: Record<MessageType, typeof FileText> = {
 };
 
 const messageColorMap: Record<MessageType, string> = {
-  text: "bg-blue-100 text-blue-600",
-  photo: "bg-green-100 text-green-600",
-  video: "bg-purple-100 text-purple-600",
-  document: "bg-orange-100 text-orange-600",
-  audio: "bg-pink-100 text-pink-600",
-  voice: "bg-pink-100 text-pink-600",
-  animation: "bg-purple-100 text-purple-600",
-  sticker: "bg-green-100 text-green-600",
-  other: "bg-blue-100 text-blue-600",
+  text: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200",
+  photo: "bg-green-100 text-green-600 dark:bg-green-500/15 dark:text-green-200",
+  video: "bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-200",
+  document: "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-200",
+  audio: "bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-200",
+  voice: "bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-200",
+  animation: "bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-200",
+  sticker: "bg-green-100 text-green-600 dark:bg-green-500/15 dark:text-green-200",
+  other: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200",
 };
 
 type MessageEditItem = {
@@ -188,7 +188,7 @@ function highlightText(text: string, rawQuery: string): ReactNode {
     const key = `${index}-${part}`;
     if (keywordSet.has(part.toLowerCase())) {
       return (
-        <mark key={key} className="rounded bg-yellow-200/70 px-0.5">
+        <mark key={key} className="rounded bg-yellow-200/70 px-0.5 dark:bg-yellow-500/20 dark:text-yellow-200">
           {part}
         </mark>
       );
@@ -1113,7 +1113,7 @@ export function MessagesBrowser() {
             <Checkbox label="合并媒体组（推荐）" checked={groupMedia} onChange={(checked) => setGroupMedia(checked)} />
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 text-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 text-sm dark:border-white/10 dark:bg-slate-900/40">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">我的预设（保存到服务器）</div>
               <button
@@ -1129,12 +1129,12 @@ export function MessagesBrowser() {
             {savedPresets.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {savedPresets.map((p) => (
-                  <div key={p.id} className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white/60">
+                  <div key={p.id} className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white/60 dark:border-white/10 dark:bg-slate-900/40">
                     <button
                       type="button"
                       onClick={() => applyPresetQueryString(p.query)}
                       disabled={loading}
-                      className="inline-flex h-9 items-center justify-center px-3 text-xs text-gray-800 hover:bg-white/80 disabled:opacity-50"
+                      className="inline-flex h-9 items-center justify-center px-3 text-xs text-gray-800 hover:bg-white/80 disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/10"
                       title={p.query}
                     >
                       {p.name}
@@ -1143,7 +1143,7 @@ export function MessagesBrowser() {
                       type="button"
                       onClick={() => deletePreset(p.id)}
                       disabled={loading}
-                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50"
+                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/10"
                       title="删除这个预设"
                     >
                       ×
@@ -1152,10 +1152,10 @@ export function MessagesBrowser() {
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-xs text-black/60">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
+              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
             )}
 
-            <div className="mt-3 border-t border-black/10 pt-3">
+            <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
               <div className="font-medium">内置快捷（点一下就查询）</div>
               <div className="mt-2 flex flex-wrap gap-2">
               <button
@@ -1171,7 +1171,7 @@ export function MessagesBrowser() {
                   })
                 }
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 全部
               </button>
@@ -1179,7 +1179,7 @@ export function MessagesBrowser() {
                 type="button"
                 onClick={() => applyPreset({ status: "failed", skipReasonFilter: "" })}
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 失败
               </button>
@@ -1187,7 +1187,7 @@ export function MessagesBrowser() {
                 type="button"
                 onClick={() => applyPreset({ status: "skipped", skipReasonFilter: "" })}
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 已跳过
               </button>
@@ -1195,7 +1195,7 @@ export function MessagesBrowser() {
                 type="button"
                 onClick={() => applyPreset({ status: "skipped", skipReasonFilter: "protected_content" })}
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 受保护跳过
               </button>
@@ -1203,7 +1203,7 @@ export function MessagesBrowser() {
                 type="button"
                 onClick={() => applyPreset({ hasMediaFilter: "true", skipReasonFilter: "" })}
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 仅媒体
               </button>
@@ -1265,7 +1265,7 @@ export function MessagesBrowser() {
                   void copyQueryLink();
                 }}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                className="ui-btn ui-btn-secondary h-10"
               >
                 复制查询链接
               </button>
@@ -1274,12 +1274,12 @@ export function MessagesBrowser() {
                   href={exportUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5"
+                  className="ui-btn ui-btn-secondary h-10"
                 >
                   导出(JSONL)
                 </a>
               ) : (
-                <span className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm text-black/40">
+                <span className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm text-black/40 dark:border-white/10 dark:text-slate-500">
                   导出(JSONL)
                 </span>
               )}
@@ -1333,24 +1333,24 @@ export function MessagesBrowser() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ui-section-title">消息列表</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
               {items.length ? `已加载 ${items.length} 条` : "暂无数据（先点击“查询”）"}
             </p>
           </div>
-	          <button
-	            type="button"
-	            onClick={() => {
-	              setNotice("");
-	              setOpenEditHistoryId(null);
-	              setOpenMediaGroupKey(null);
-	              syncUrlToCurrentQuery();
-	              void fetchMessages({ reset: true });
-	            }}
-	            disabled={loading || (!selectedChannelId && !channels.length)}
-	            className="ui-btn ui-btn-secondary h-10"
-	          >
-	            {loading ? "刷新中..." : "刷新"}
-	          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setNotice("");
+              setOpenEditHistoryId(null);
+              setOpenMediaGroupKey(null);
+              syncUrlToCurrentQuery();
+              void fetchMessages({ reset: true });
+            }}
+            disabled={loading || (!selectedChannelId && !channels.length)}
+            className="ui-btn ui-btn-secondary h-10"
+          >
+            {loading ? "刷新中..." : "刷新"}
+          </button>
         </div>
 
         <div className="mt-4 space-y-3">
@@ -1391,7 +1391,7 @@ export function MessagesBrowser() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-medium text-gray-600">
+                          <p className="text-sm font-medium text-gray-600 dark:text-slate-300">
                             <a href={`/channels/${encodeURIComponent(m.sourceChannel.id)}`} className="hover:underline">
                               {m.sourceChannel.name}
                             </a>
@@ -1417,7 +1417,7 @@ export function MessagesBrowser() {
                                 setOpenMediaGroupKey(null);
                                 syncUrlToCurrentQuery(channelId);
                               }}
-                              className="px-2 py-0.5 bg-white/60 hover:bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700 transition-all disabled:opacity-50"
+                              className="px-2 py-0.5 bg-white/60 hover:bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700 transition-all disabled:opacity-50 dark:bg-slate-900/40 dark:hover:bg-white/10 dark:border-white/10 dark:text-slate-200"
                             >
                               只看该频道
                             </button>
@@ -1430,7 +1430,12 @@ export function MessagesBrowser() {
 
                         {m.textPreview || m.text ? (
                           <>
-                            <div className={clsx("text-gray-900 mt-1 whitespace-pre-wrap", isExpandedText ? "" : "line-clamp-3")}>
+                            <div
+                              className={clsx(
+                                "text-gray-900 dark:text-slate-100 mt-1 whitespace-pre-wrap",
+                                isExpandedText ? "" : "line-clamp-3",
+                              )}
+                            >
                               {highlightText(isExpandedText ? (m.text ?? m.textPreview ?? "") : (m.textPreview ?? m.text ?? ""), q)}
                             </div>
                             {shouldShowToggleText ? (
@@ -1444,7 +1449,7 @@ export function MessagesBrowser() {
                             ) : null}
                           </>
                         ) : (
-                          <p className="text-gray-900 mt-1">
+                          <p className="text-gray-900 dark:text-slate-100 mt-1">
                             {m.hasMedia
                               ? m.groupSize > 1
                                 ? `（媒体组 ${m.groupSize} 条${fileSizeText ? ` · ${fileSizeText}` : ""}）`
@@ -1458,7 +1463,7 @@ export function MessagesBrowser() {
                             <button
                               type="button"
                               onClick={() => toggleMediaGroup(m)}
-                              className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all"
+                              className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-all dark:bg-blue-500/15 dark:text-blue-200 dark:hover:bg-blue-500/25"
                             >
                               {openMediaGroupKey === mediaGroupKey ? "收起相册" : "展开相册"}（{m.groupSize}）
                             </button>
@@ -1478,19 +1483,19 @@ export function MessagesBrowser() {
                           href={externalLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-2 hover:bg-white/60 rounded-lg transition-all"
+                          className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all"
                           title="打开链接"
                         >
-                          <ExternalLink className="w-5 h-5 text-gray-400" />
+                          <ExternalLink className="w-5 h-5 text-gray-400 dark:text-slate-400" />
                         </a>
                       ) : (
                         <span className="p-2 rounded-lg opacity-40">
-                          <ExternalLink className="w-5 h-5 text-gray-400" />
+                          <ExternalLink className="w-5 h-5 text-gray-400 dark:text-slate-400" />
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center justify-between text-sm text-gray-500 dark:text-slate-400">
                       <span>{formatTime(m.sentAt)}</span>
                       <div className="flex items-center gap-3">
                         {telegramViewLink ? (
@@ -1503,7 +1508,7 @@ export function MessagesBrowser() {
                             在 Telegram 中查看
                           </a>
                         ) : (
-                          <span className="text-gray-400 font-medium">在 Telegram 中查看</span>
+                          <span className="text-gray-400 dark:text-slate-500 font-medium">在 Telegram 中查看</span>
                         )}
                         {isEditedAfterMirror(m) ? (
                           <button
@@ -1517,32 +1522,32 @@ export function MessagesBrowser() {
                       </div>
                     </div>
 
-                    {m.errorMessage ? <div className="text-xs text-red-700 whitespace-pre-wrap">{m.errorMessage}</div> : null}
+                    {m.errorMessage ? <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{m.errorMessage}</div> : null}
 
                     {groupMedia && m.groupSize > 1 && mediaGroupKey && openMediaGroupKey === mediaGroupKey ? (
-                      <div className="mt-3 rounded-2xl border border-gray-200 bg-white/50 p-4 text-xs">
+                      <div className="mt-3 rounded-2xl border border-gray-200 bg-white/50 p-4 text-xs dark:border-white/10 dark:bg-slate-900/40">
                         {mediaGroupLoadingKey === mediaGroupKey ? (
-                          <div className="text-gray-500">相册加载中...</div>
+                          <div className="text-gray-500 dark:text-slate-400">相册加载中...</div>
                         ) : mediaGroupErrorByKey[mediaGroupKey] ? (
-                          <div className="text-red-700 whitespace-pre-wrap">{mediaGroupErrorByKey[mediaGroupKey]}</div>
+                          <div className="text-red-700 dark:text-red-200 whitespace-pre-wrap">{mediaGroupErrorByKey[mediaGroupKey]}</div>
                         ) : mediaGroupItemsByKey[mediaGroupKey]?.length ? (
                           <div className="space-y-2">
-                            <div className="text-gray-600">相册共 {mediaGroupItemsByKey[mediaGroupKey]!.length} 条</div>
+                            <div className="text-gray-600 dark:text-slate-300">相册共 {mediaGroupItemsByKey[mediaGroupKey]!.length} 条</div>
                             {mediaGroupItemsByKey[mediaGroupKey]!.map((item, idx) => {
                               const sizeText = formatFileSize(item.fileSize);
                               return (
-                                <div key={item.id} className="rounded-xl border border-gray-200 bg-white/60 p-3">
-                                  <div className="text-gray-600">
+                                <div key={item.id} className="rounded-xl border border-gray-200 bg-white/60 p-3 dark:border-white/10 dark:bg-slate-900/40">
+                                  <div className="text-gray-600 dark:text-slate-300">
                                     #{idx + 1} · id={item.sourceMessageId} · {labelMessageType(item.messageType)} · {labelMessageStatus(item.status)}
                                     {sizeText ? ` · ${sizeText}` : ""}
                                   </div>
                                   {item.skipReason ? (
-                                    <div className="mt-1 text-orange-700">
+                                    <div className="mt-1 text-orange-700 dark:text-orange-200">
                                       skip: {item.skipReason}（{labelSkipReason(item.skipReason)}）
                                     </div>
                                   ) : null}
                                   {item.errorMessage ? (
-                                    <div className="mt-1 text-red-700 whitespace-pre-wrap">{item.errorMessage}</div>
+                                    <div className="mt-1 text-red-700 dark:text-red-200 whitespace-pre-wrap">{item.errorMessage}</div>
                                   ) : null}
                                   {item.textPreview ? (
                                     <div className="mt-2 whitespace-pre-wrap">{highlightText(item.textPreview, q)}</div>
@@ -1558,7 +1563,7 @@ export function MessagesBrowser() {
                                         原文
                                       </a>
                                     ) : (
-                                      <span className="text-gray-400 font-medium">原文</span>
+                                      <span className="text-gray-400 dark:text-slate-500 font-medium">原文</span>
                                     )}
                                     {item.links.mirror ? (
                                       <a
@@ -1570,7 +1575,7 @@ export function MessagesBrowser() {
                                         备份
                                       </a>
                                     ) : (
-                                      <span className="text-gray-400 font-medium">备份</span>
+                                      <span className="text-gray-400 dark:text-slate-500 font-medium">备份</span>
                                     )}
                                   </div>
                                 </div>
@@ -1578,17 +1583,17 @@ export function MessagesBrowser() {
                             })}
                           </div>
                         ) : (
-                          <div className="text-gray-500">相册暂无数据</div>
+                          <div className="text-gray-500 dark:text-slate-400">相册暂无数据</div>
                         )}
                       </div>
                     ) : null}
 
                     {openEditHistoryId === historyKey ? (
-                      <div className="mt-3 rounded-2xl border border-gray-200 bg-white/50 p-4 text-xs">
+                      <div className="mt-3 rounded-2xl border border-gray-200 bg-white/50 p-4 text-xs dark:border-white/10 dark:bg-slate-900/40">
                         {editHistoryLoadingId === historyKey ? (
-                          <div className="text-gray-500">加载中...</div>
+                          <div className="text-gray-500 dark:text-slate-400">加载中...</div>
                         ) : editHistoryErrorByMessageId[historyKey] ? (
-                          <div className="text-red-700 whitespace-pre-wrap">{editHistoryErrorByMessageId[historyKey]}</div>
+                          <div className="text-red-700 dark:text-red-200 whitespace-pre-wrap">{editHistoryErrorByMessageId[historyKey]}</div>
                         ) : editHistoryByMessageId[historyKey]?.length ? (
                           <div className="max-h-64 space-y-3 overflow-auto">
                             {(() => {
@@ -1602,12 +1607,12 @@ export function MessagesBrowser() {
 
                               return (
                                 <>
-                                  <div className="text-gray-600">
+                                  <div className="text-gray-600 dark:text-slate-300">
                                     已记录 {edits.length} 次编辑{edits.length === m.editCount ? "" : `（editCount=${m.editCount}）`}
                                   </div>
                                   {versions.map((v) => (
-                                    <div key={v.key} className="rounded-xl border border-gray-200 bg-white/60 p-3">
-                                      <div className="text-gray-600">
+                                    <div key={v.key} className="rounded-xl border border-gray-200 bg-white/60 p-3 dark:border-white/10 dark:bg-slate-900/40">
+                                      <div className="text-gray-600 dark:text-slate-300">
                                         v{v.version} · {formatTime(v.at)}
                                       </div>
                                       <div className="mt-2 whitespace-pre-wrap">
@@ -1620,7 +1625,7 @@ export function MessagesBrowser() {
                             })()}
                           </div>
                         ) : (
-                          <div className="text-gray-500">暂无编辑历史</div>
+                          <div className="text-gray-500 dark:text-slate-400">暂无编辑历史</div>
                         )}
                       </div>
                     ) : null}
@@ -1636,7 +1641,7 @@ export function MessagesBrowser() {
             type="button"
             onClick={() => fetchMessages({ reset: false })}
             disabled={!canLoadMore}
-            className="w-full py-3 bg-white/50 hover:bg-white border border-gray-200 rounded-xl font-medium text-gray-700 transition-all disabled:opacity-50"
+            className="w-full py-3 bg-white/50 hover:bg-white border border-gray-200 rounded-xl font-medium text-gray-700 transition-all disabled:opacity-50 dark:bg-slate-900/40 dark:hover:bg-slate-900/60 dark:border-white/10 dark:text-slate-100"
           >
             {loading ? "加载中..." : nextCursor ? "加载更多" : "没有更多了"}
           </button>

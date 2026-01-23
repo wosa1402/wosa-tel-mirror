@@ -59,7 +59,7 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <div className="glass-panel w-full max-w-md rounded-2xl p-8">
-          <div className="text-sm text-gray-600">加载中...</div>
+          <div className="text-sm text-gray-600 dark:text-slate-300">加载中...</div>
         </div>
       </div>
     );
@@ -74,7 +74,7 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             需要访问密码
           </h1>
-          <p className="text-sm text-gray-600">该 Web 已启用访问控制，请输入密码继续。</p>
+          <p className="text-sm text-gray-600 dark:text-slate-300">该 Web 已启用访问控制，请输入密码继续。</p>
         </div>
 
         {error ? <div className="ui-alert-error mt-4">{error}</div> : null}

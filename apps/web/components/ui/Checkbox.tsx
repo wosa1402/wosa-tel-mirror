@@ -60,7 +60,7 @@ export function Checkbox({
             "w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center",
             isChecked
               ? "bg-gradient-to-br from-blue-500 to-purple-600 border-transparent scale-100"
-              : "border-gray-300 bg-white group-hover:border-blue-400",
+              : "border-gray-300 bg-white group-hover:border-blue-400 dark:border-white/20 dark:bg-slate-900/50",
             !disabled && "group-hover:scale-105",
           )}
         >
@@ -77,15 +77,14 @@ export function Checkbox({
       <div className="flex-1">
         <span
           className={clsx(
-            "text-sm font-medium text-gray-700",
-            !disabled && "group-hover:text-gray-900",
+            "text-sm font-medium text-gray-700 dark:text-slate-200",
+            !disabled && "group-hover:text-gray-900 dark:group-hover:text-slate-100",
           )}
         >
           {label}
         </span>
-        {description ? <p className="text-xs text-gray-500 mt-0.5">{description}</p> : null}
+        {description ? <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{description}</p> : null}
       </div>
     </label>
   );
 }
-

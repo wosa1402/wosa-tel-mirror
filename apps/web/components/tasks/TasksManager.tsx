@@ -92,7 +92,7 @@ function taskStatusBadgeClass(status: TaskStatus): string {
   if (status === "running") return "bg-green-100 text-green-700";
   if (status === "pending") return "bg-blue-100 text-blue-700";
   if (status === "failed") return "bg-red-100 text-red-700";
-  return "bg-gray-100 text-gray-700";
+  return "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-slate-200";
 }
 
 function labelTaskType(type: TaskType): string {
@@ -644,14 +644,14 @@ export function TasksManager({
             </div>
           </div>
 
-          <div className="rounded-md border border-black/10 bg-black/5 p-3 text-sm">
+          <div className="rounded-md border border-black/10 bg-black/5 p-3 text-sm dark:border-white/10 dark:bg-white/5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">我的预设（保存到服务器）</div>
               <button
                 type="button"
                 onClick={() => saveCurrentAsPreset()}
                 disabled={!canRefresh}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 保存当前为预设
               </button>
@@ -660,12 +660,12 @@ export function TasksManager({
             {savedPresets.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {savedPresets.map((p) => (
-                  <div key={p.id} className="inline-flex overflow-hidden rounded-md border border-black/10 bg-white">
+                  <div key={p.id} className="inline-flex overflow-hidden rounded-md border border-black/10 bg-white dark:border-white/10 dark:bg-slate-900/40">
                     <button
                       type="button"
                       onClick={() => applyPresetQueryString(p.query)}
                       disabled={!canRefresh}
-                      className="inline-flex h-8 items-center justify-center px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                      className="inline-flex h-8 items-center justify-center px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/10"
                       title={p.query}
                     >
                       {p.name}
@@ -674,7 +674,7 @@ export function TasksManager({
                       type="button"
                       onClick={() => deletePreset(p.id)}
                       disabled={!canRefresh}
-                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50"
+                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/10"
                       title="删除这个预设"
                     >
                       ×
@@ -683,17 +683,17 @@ export function TasksManager({
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-xs text-black/60">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
+              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
             )}
 
-            <div className="mt-3 border-t border-black/10 pt-3">
+            <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
               <div className="font-medium">内置快捷（点一下就刷新）</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => applyPreset({ status: "running", taskType: "" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   运行中
                 </button>
@@ -701,7 +701,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "pending", taskType: "" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   待处理
                 </button>
@@ -709,7 +709,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "paused", taskType: "" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   暂停
                 </button>
@@ -717,7 +717,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "failed", taskType: "" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   失败
                 </button>
@@ -725,7 +725,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "", taskType: "resolve" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   resolve
                 </button>
@@ -733,7 +733,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "", taskType: "history_full" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   history_full
                 </button>
@@ -741,7 +741,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "", taskType: "realtime" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   realtime
                 </button>
@@ -749,7 +749,7 @@ export function TasksManager({
                   type="button"
                   onClick={() => applyPreset({ status: "", taskType: "retry_failed" })}
                   disabled={!canRefresh}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   retry_failed
                 </button>
@@ -793,7 +793,7 @@ export function TasksManager({
 	                  void copyQueryLink();
 	                }}
 	                disabled={loading}
-	                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+	                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
 	              >
 	                复制筛选链接
 	              </button>
@@ -801,7 +801,7 @@ export function TasksManager({
 	                type="button"
 	                onClick={retryFailedMessages}
 	                disabled={retryFailedDisabled}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 重试 failed（创建任务）
               </button>
@@ -858,7 +858,7 @@ export function TasksManager({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ui-section-title">任务列表</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
               {viewMode === "channel"
                 ? groupedByChannel.length
                   ? `共 ${groupedByChannel.length} 个频道 · ${visibleTasks.length} 个任务`
@@ -917,7 +917,7 @@ export function TasksManager({
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-semibold text-gray-900 truncate">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">
                                 <a href={`/channels/${encodeURIComponent(t.sourceChannelId)}`} className="hover:underline">
                                   {t.source.name}
                                 </a>
@@ -931,7 +931,7 @@ export function TasksManager({
                                 {statusLabel}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">{typeLabel}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-300 mt-1">{typeLabel}</p>
                           </div>
 
                           <div className="flex items-center gap-2">
@@ -939,7 +939,7 @@ export function TasksManager({
                               type="button"
                               onClick={primaryAction}
                               disabled={loading}
-                              className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                              className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                               title={t.status === "running" ? "暂停" : t.status === "paused" ? "恢复" : "重启"}
                             >
                               {t.status === "running" ? (
@@ -952,7 +952,7 @@ export function TasksManager({
                               type="button"
                               onClick={refreshAction}
                               disabled={loading || t.status === "running"}
-                              className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                              className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                               title={t.status === "pending" ? "重排队" : "重启"}
                             >
                               <RefreshCw className="w-5 h-5 text-blue-600" />
@@ -960,30 +960,30 @@ export function TasksManager({
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-4">
-                              <span className="text-gray-600">{progressText}</span>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-4">
+                              <span className="text-gray-600 dark:text-slate-300">{progressText}</span>
                               {eta ? (
-                                <div className="flex items-center gap-1 text-gray-500">
+                                <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400">
                                   <Clock className="w-4 h-4" />
                                   预计 {eta}
                                 </div>
                               ) : null}
+                              </div>
+                            <span className="font-medium text-gray-900 dark:text-slate-100">{Math.round(pct)}%</span>
                             </div>
-                            <span className="font-medium text-gray-900">{Math.round(pct)}%</span>
-                          </div>
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                        </div>
+                          </div>
 
-                        <div className="flex items-center gap-6 text-sm text-gray-600">
+                        <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-slate-300">
                           <div>
-                            <span className="text-gray-500">开始时间:</span> {startTime}
+                            <span className="text-gray-500 dark:text-slate-400">开始时间:</span> {startTime}
                           </div>
                           {t.status === "running" ? (
                             <div className="flex items-center gap-1">
@@ -993,7 +993,7 @@ export function TasksManager({
                           ) : null}
                         </div>
 
-                        {t.lastError ? <div className="text-xs text-red-700 whitespace-pre-wrap">{t.lastError}</div> : null}
+                        {t.lastError ? <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div> : null}
                       </div>
                     </div>
                   );
@@ -1034,7 +1034,7 @@ export function TasksManager({
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-gray-900 truncate">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">
                             <a href={`/channels/${encodeURIComponent(t.sourceChannelId)}`} className="hover:underline">
                               {t.source.name}
                             </a>
@@ -1043,7 +1043,7 @@ export function TasksManager({
                             {statusLabel}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{typeLabel}</p>
+                        <p className="text-sm text-gray-600 dark:text-slate-300 mt-1">{typeLabel}</p>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1051,7 +1051,7 @@ export function TasksManager({
                           type="button"
                           onClick={primaryAction}
                           disabled={loading}
-                          className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                          className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                           title={t.status === "running" ? "暂停" : t.status === "paused" ? "恢复" : "重启"}
                         >
                           {t.status === "running" ? (
@@ -1064,7 +1064,7 @@ export function TasksManager({
                           type="button"
                           onClick={refreshAction}
                           disabled={loading || t.status === "running"}
-                          className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                          className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                           title={t.status === "pending" ? "重排队" : "重启"}
                         >
                           <RefreshCw className="w-5 h-5 text-blue-600" />
@@ -1075,17 +1075,17 @@ export function TasksManager({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-4">
-                          <span className="text-gray-600">{progressText}</span>
+                          <span className="text-gray-600 dark:text-slate-300">{progressText}</span>
                           {eta ? (
-                            <div className="flex items-center gap-1 text-gray-500">
+                            <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400">
                               <Clock className="w-4 h-4" />
                               预计 {eta}
                             </div>
                           ) : null}
                         </div>
-                        <span className="font-medium text-gray-900">{Math.round(pct)}%</span>
+                        <span className="font-medium text-gray-900 dark:text-slate-100">{Math.round(pct)}%</span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all"
                           style={{ width: `${pct}%` }}
@@ -1093,9 +1093,9 @@ export function TasksManager({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6 text-sm text-gray-600">
+                    <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-slate-300">
                       <div>
-                        <span className="text-gray-500">开始时间:</span> {startTime}
+                        <span className="text-gray-500 dark:text-slate-400">开始时间:</span> {startTime}
                       </div>
                       {t.status === "running" ? (
                         <div className="flex items-center gap-1">
@@ -1105,7 +1105,7 @@ export function TasksManager({
                       ) : null}
                     </div>
 
-                    {t.lastError ? <div className="text-xs text-red-700 whitespace-pre-wrap">{t.lastError}</div> : null}
+                    {t.lastError ? <div className="text-xs text-red-700 dark:text-red-200 whitespace-pre-wrap">{t.lastError}</div> : null}
                   </div>
                 </div>
               );

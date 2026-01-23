@@ -48,22 +48,22 @@ const iconMap: Record<EventLevel, typeof Info> = {
 
 const colorMap: Record<EventLevel, { bg: string; text: string; icon: string; border: string }> = {
   info: {
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    icon: "text-blue-500",
-    border: "border-blue-200",
+    bg: "bg-blue-100 dark:bg-blue-500/15",
+    text: "text-blue-700 dark:text-blue-200",
+    icon: "text-blue-600 dark:text-blue-300",
+    border: "border-blue-200 dark:border-blue-500/30",
   },
   warn: {
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-    icon: "text-orange-500",
-    border: "border-orange-200",
+    bg: "bg-orange-100 dark:bg-orange-500/15",
+    text: "text-orange-700 dark:text-orange-200",
+    icon: "text-orange-600 dark:text-orange-300",
+    border: "border-orange-200 dark:border-orange-500/30",
   },
   error: {
-    bg: "bg-red-50",
-    text: "text-red-700",
-    icon: "text-red-500",
-    border: "border-red-200",
+    bg: "bg-red-100 dark:bg-red-500/15",
+    text: "text-red-700 dark:text-red-200",
+    icon: "text-red-600 dark:text-red-300",
+    border: "border-red-200 dark:border-red-500/30",
   },
 };
 
@@ -153,7 +153,7 @@ export function EventsFeed({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="ui-section-title">{title}</h2>
-          <p className="mt-1 text-sm text-gray-600">sync_events（仅记录关键事件，不会按消息刷屏）。</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">sync_events（仅记录关键事件，不会按消息刷屏）。</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
@@ -187,7 +187,7 @@ export function EventsFeed({
 
       <div className="mt-4 space-y-3">
         {!events.length ? (
-          <div className="text-sm text-gray-600">{loading ? "加载中..." : "暂无事件"}</div>
+          <div className="text-sm text-gray-600 dark:text-slate-300">{loading ? "加载中..." : "暂无事件"}</div>
         ) : (
           events.map((e) => {
             const Icon = iconMap[e.level];
@@ -218,7 +218,7 @@ export function EventsFeed({
                   <div className="flex-1 min-w-0 space-y-2">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-gray-900">{title}</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-slate-100">{title}</h3>
                         <span
                           className={clsx(
                             "px-2 py-0.5 text-xs rounded-full font-medium",
@@ -229,11 +229,11 @@ export function EventsFeed({
                           {e.level.toUpperCase()}
                         </span>
                       </div>
-                      {detail ? <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{detail}</p> : null}
+                      {detail ? <p className="text-sm text-gray-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{detail}</p> : null}
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span className="font-medium text-gray-700">{channelText}</span>
+                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-slate-400">
+                      <span className="font-medium text-gray-700 dark:text-slate-200">{channelText}</span>
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {formatTime(e.createdAt)}

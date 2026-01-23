@@ -964,7 +964,7 @@ export function ChannelsManager({
         <h2 className="ui-section-title">添加频道</h2>
         <div className="mt-4 grid grid-cols-1 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm text-gray-600">提示：批量添加适合一次性添加很多频道。</div>
+            <div className="text-sm text-gray-600 dark:text-slate-300">提示：批量添加适合一次性添加很多频道。</div>
             <Checkbox
               label="批量添加"
               checked={bulkAddMode}
@@ -987,7 +987,7 @@ export function ChannelsManager({
                   className="ui-textarea"
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-gray-600">支持换行/空格/逗号分隔，会自动去重。</div>
+                  <div className="text-xs text-gray-600 dark:text-slate-300">支持换行/空格/逗号分隔，会自动去重。</div>
                   <button
                     type="button"
                     onClick={() => openPicker("source")}
@@ -1024,7 +1024,7 @@ export function ChannelsManager({
                 placeholder="例如：工作 / 备份测试（留空=未分组）"
                 className="ui-input mt-1"
               />
-              <div className="mt-1 text-xs text-gray-600">最多 50 个字，留空表示“不分组”。</div>
+              <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">最多 50 个字，留空表示“不分组”。</div>
             </div>
             <div>
               <label className="block text-sm font-medium">优先级（-100~100，越大越优先）</label>
@@ -1037,7 +1037,7 @@ export function ChannelsManager({
                 onChange={(e) => setNewPriority(e.target.value)}
                 className="ui-input mt-1"
               />
-              <div className="mt-1 text-xs text-gray-600">默认 0；比如设 10，表示这个频道任务更优先跑。</div>
+              <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">默认 0；比如设 10，表示这个频道任务更优先跑。</div>
             </div>
           </div>
           <div>
@@ -1072,18 +1072,18 @@ export function ChannelsManager({
                     value={mirrorChannelIdentifier}
                     onChange={(e) => setMirrorChannelIdentifier(e.target.value)}
                     placeholder="me / @backup_channel / https://t.me/+xxxxx / -1001234567890"
-                    className="h-10 w-full flex-1 rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                    className="h-10 w-full flex-1 rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:focus:border-white/20"
                   />
                   <button
                     type="button"
                     onClick={() => openPicker("mirror")}
-                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5"
+                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                   >
                     从 Telegram 选择
                   </button>
                 </div>
               ) : (
-                <div className="rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm text-black/70">
+                <div className="rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm text-black/70 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                   将由 mirror-service 使用当前登录账号创建一个新的私密频道作为备份频道。可在{" "}
                   <a href="/settings" className="underline">
                     系统设置
@@ -1123,7 +1123,7 @@ export function ChannelsManager({
             </button>
 
             {bulkAddMode && bulkAddProgress ? (
-              <div className="mt-3 rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm">
+              <div className="mt-3 rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm dark:border-white/10 dark:bg-white/5">
                 <div className="text-black/70">
                   批量添加进度：{bulkAddProgress.processed}/{bulkAddProgress.total}（创建 {bulkAddProgress.created} · 已存在{" "}
                   {bulkAddProgress.existed} · 失败 {bulkAddProgress.failed}）
@@ -1151,7 +1151,7 @@ export function ChannelsManager({
       {pickerOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => closePicker()}>
           <div
-            className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-lg"
+            className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-lg dark:bg-slate-950 dark:text-slate-100 dark:shadow-black/40 dark:border dark:border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -1166,7 +1166,7 @@ export function ChannelsManager({
               <button
                 type="button"
                 onClick={() => closePicker()}
-                className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 text-sm hover:bg-black/5"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 hover:bg-black/5 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 关闭
               </button>
@@ -1177,13 +1177,13 @@ export function ChannelsManager({
                 value={telegramChannelsQuery}
                 onChange={(e) => setTelegramChannelsQuery(e.target.value)}
                 placeholder="搜索标题 / @username / -100..."
-                className="h-10 w-full flex-1 rounded-md border border-black/10 px-3 text-sm outline-none focus:border-black/30"
+                className="h-10 w-full flex-1 rounded-md border border-black/10 bg-white px-3 text-sm text-gray-900 outline-none focus:border-black/30 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:focus:border-white/20"
               />
               <button
                 type="button"
                 onClick={() => void loadTelegramChannels({ force: true })}
                 disabled={telegramChannelsLoading}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-black/10 px-4 text-sm hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 {telegramChannelsLoading ? "加载中..." : "刷新列表"}
               </button>
@@ -1195,7 +1195,7 @@ export function ChannelsManager({
               </div>
             ) : null}
 
-            <div className="mt-4 max-h-[60vh] overflow-auto rounded-md border border-black/10">
+            <div className="mt-4 max-h-[60vh] overflow-auto rounded-md border border-black/10 dark:border-white/10">
               {telegramChannelsLoading && telegramChannels.length === 0 ? (
                 <div className="p-4 text-sm text-black/60">加载中...</div>
               ) : filteredTelegramChannels.length === 0 ? (
@@ -1209,7 +1209,7 @@ export function ChannelsManager({
                       <button
                         type="button"
                         onClick={() => chooseTelegramChannel(c)}
-                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-black/5"
+                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/10"
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{c.title}</div>
@@ -1234,7 +1234,7 @@ export function ChannelsManager({
 	        <div className="flex items-center justify-between">
 	          <div>
 	            <h2 className="ui-section-title">频道列表</h2>
-	            <p className="mt-1 text-sm text-gray-600">
+	            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
 	              共 {channels.length} 个频道{visibleChannels.length !== channels.length ? ` · 筛选后 ${visibleChannels.length} 个` : ""} ·
 	              未解析/未就绪：{unresolvedCount}（需要运行 mirror-service 来 resolve 并开始同步）
 	            </p>
@@ -1389,7 +1389,7 @@ export function ChannelsManager({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 text-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 text-sm dark:border-white/10 dark:bg-slate-900/40">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">我的预设（保存到服务器）</div>
               <button
@@ -1405,12 +1405,12 @@ export function ChannelsManager({
             {savedPresets.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {savedPresets.map((p) => (
-                  <div key={p.id} className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white/60">
+                  <div key={p.id} className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white/60 dark:border-white/10 dark:bg-slate-900/50">
                     <button
                       type="button"
                       onClick={() => applyPresetQueryString(p.query)}
                       disabled={loading}
-                      className="inline-flex h-9 items-center justify-center px-3 text-xs text-gray-800 hover:bg-white/80 disabled:opacity-50"
+                      className="inline-flex h-9 items-center justify-center px-3 text-xs text-gray-800 hover:bg-white/80 disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/10"
                       title={p.query}
                     >
                       {p.name}
@@ -1419,7 +1419,7 @@ export function ChannelsManager({
                       type="button"
                       onClick={() => deletePreset(p.id)}
                       disabled={loading}
-                      className="inline-flex h-9 items-center justify-center border-l border-gray-200 px-2 text-xs text-gray-500 hover:bg-white/80 disabled:opacity-50"
+                      className="inline-flex h-9 items-center justify-center border-l border-gray-200 px-2 text-xs text-gray-500 hover:bg-white/80 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/10"
                       title="删除这个预设"
                     >
                       ×
@@ -1428,10 +1428,10 @@ export function ChannelsManager({
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-xs text-gray-600">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
+              <div className="mt-2 text-xs text-gray-600 dark:text-slate-300">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
             )}
 
-            <div className="mt-4 border-t border-white/20 pt-4">
+            <div className="mt-4 border-t border-white/20 dark:border-white/10 pt-4">
               <div className="font-medium">内置快捷</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
@@ -1582,20 +1582,20 @@ export function ChannelsManager({
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-semibold text-gray-900 truncate">{title}</h3>
+                            <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 truncate">{title}</h3>
                             {c.isProtected ? (
                               <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">受保护</span>
                             ) : null}
                             <span
                               className={clsx(
                                 "px-2 py-0.5 text-xs rounded-full",
-                                c.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700",
+                                c.isActive ? "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-200" : "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-slate-200",
                               )}
                             >
                               {c.isActive ? "活跃" : "暂停"}
                             </span>
                           </div>
-                          <p className="text-gray-600 mt-1 truncate">{subtitle}</p>
+                          <p className="text-gray-600 dark:text-slate-300 mt-1 truncate">{subtitle}</p>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1603,11 +1603,11 @@ export function ChannelsManager({
                             type="button"
                             onClick={() => toggleActive(c)}
                             disabled={loading}
-                            className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                            className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                             title={c.isActive ? "暂停同步" : "启用同步"}
                           >
                             {c.isActive ? (
-                              <Pause className="w-5 h-5 text-gray-600" />
+                              <Pause className="w-5 h-5 text-gray-600 dark:text-slate-300" />
                             ) : (
                               <Play className="w-5 h-5 text-green-600" />
                             )}
@@ -1616,7 +1616,7 @@ export function ChannelsManager({
                             type="button"
                             onClick={() => deleteChannel(c)}
                             disabled={loading}
-                            className="p-2 hover:bg-white/60 rounded-lg transition-all disabled:opacity-50"
+                            className="p-2 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-lg transition-all disabled:opacity-50"
                             title="删除频道"
                           >
                             <Trash2 className="w-5 h-5 text-red-600" />
@@ -1626,34 +1626,34 @@ export function ChannelsManager({
 
                       <div className="grid grid-cols-3 gap-4">
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-gray-400" />
+                          <Users className="w-4 h-4 text-gray-400 dark:text-slate-400" />
                           <div>
-                            <p className="text-sm text-gray-600">成员</p>
-                            <p className="font-semibold text-gray-900">{memberText}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-300">成员</p>
+                            <p className="font-semibold text-gray-900 dark:text-slate-100">{memberText}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4 text-gray-400" />
+                          <MessageSquare className="w-4 h-4 text-gray-400 dark:text-slate-400" />
                           <div>
-                            <p className="text-sm text-gray-600">消息</p>
-                            <p className="font-semibold text-gray-900">{messageText}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-300">消息</p>
+                            <p className="font-semibold text-gray-900 dark:text-slate-100">{messageText}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-gray-400" />
+                          <Clock className="w-4 h-4 text-gray-400 dark:text-slate-400" />
                           <div>
-                            <p className="text-sm text-gray-600">最后同步</p>
-                            <p className="font-semibold text-gray-900">{lastSync}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-300">最后同步</p>
+                            <p className="font-semibold text-gray-900 dark:text-slate-100">{lastSync}</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">{statusLabel}</span>
-                          <span className="font-medium text-gray-900">{Math.round(progressPct)}%</span>
+                          <span className="text-gray-600 dark:text-slate-300">{statusLabel}</span>
+                          <span className="font-medium text-gray-900 dark:text-slate-100">{Math.round(progressPct)}%</span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all"
                             style={{ width: `${progressPct}%` }}
@@ -1663,7 +1663,7 @@ export function ChannelsManager({
 
                       <a
                         href={`/channels/${c.id}`}
-                        className="block w-full py-2 text-center bg-white/60 hover:bg-white border border-gray-200 rounded-xl font-medium text-gray-700 transition-all"
+                        className="block w-full py-2 text-center bg-white/60 hover:bg-white border border-gray-200 rounded-xl font-medium text-gray-700 transition-all dark:bg-slate-900/50 dark:hover:bg-slate-900/70 dark:border-white/10 dark:text-slate-200"
                       >
                         查看详情
                       </a>

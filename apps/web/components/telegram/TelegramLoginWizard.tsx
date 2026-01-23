@@ -110,7 +110,7 @@ export function TelegramLoginWizard() {
         <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           Telegram 登录
         </h2>
-        <p className="text-sm text-gray-600">登录成功后会将 session 加密写入数据库（settings.telegram_session）。</p>
+        <p className="text-sm text-gray-600 dark:text-slate-300">登录成功后会将 session 加密写入数据库（settings.telegram_session）。</p>
       </div>
 
       {error ? <div className="ui-alert-error mt-4">{error}</div> : null}
@@ -119,7 +119,7 @@ export function TelegramLoginWizard() {
         {isLoggedIn ? (
           <div className="space-y-3">
             <div className="text-sm">
-              状态：<span className="font-medium text-green-700">已登录</span>
+              状态：<span className="font-medium text-green-700 dark:text-green-300">已登录</span>
             </div>
             <button type="button" onClick={logout} disabled={loading} className="ui-btn ui-btn-secondary">
               {loading ? "处理中..." : "退出登录"}
@@ -129,7 +129,7 @@ export function TelegramLoginWizard() {
           <div className="space-y-4">
             {step === "phone" ? (
               <>
-                <label className="block text-sm font-medium text-gray-900">手机号（含国家区号）</label>
+                <label className="block text-sm font-medium text-gray-900 dark:text-slate-100">手机号（含国家区号）</label>
                 <input
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
@@ -149,7 +149,7 @@ export function TelegramLoginWizard() {
 
             {step === "code" ? (
               <>
-                <div className="text-sm text-gray-600">请输入 Telegram 发送到你账号的验证码</div>
+                <div className="text-sm text-gray-600 dark:text-slate-300">请输入 Telegram 发送到你账号的验证码</div>
                 <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="12345" className="ui-input" />
                 <button
                   type="button"
@@ -164,7 +164,7 @@ export function TelegramLoginWizard() {
 
             {step === "password" ? (
               <>
-                <div className="text-sm text-gray-600">账号开启了两步验证，请输入 2FA 密码</div>
+                <div className="text-sm text-gray-600 dark:text-slate-300">账号开启了两步验证，请输入 2FA 密码</div>
                 <input
                   type="password"
                   value={password}

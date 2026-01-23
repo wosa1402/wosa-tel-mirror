@@ -280,7 +280,7 @@ export function DashboardSummary() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="ui-section-title">系统概览</h2>
-          <p className="mt-1 text-sm text-gray-600">channels / messages / tasks</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">channels / messages / tasks</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
@@ -319,25 +319,25 @@ export function DashboardSummary() {
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-xl border border-gray-200 bg-white/50 p-4">
-            <div className="text-gray-600">{c.label}</div>
-            <div className="mt-1 text-lg font-semibold text-gray-900">{c.value}</div>
-            <div className="mt-1 text-xs text-gray-500">{c.hint}</div>
+          <div key={c.label} className="rounded-xl border border-gray-200 bg-white/50 p-4 dark:border-white/10 dark:bg-slate-900/40">
+            <div className="text-gray-600 dark:text-slate-300">{c.label}</div>
+            <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-slate-100">{c.value}</div>
+            <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">{c.hint}</div>
           </div>
         ))}
       </div>
 
       {data ? (
         <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-          <div className="rounded-xl border border-gray-200 bg-white/50 p-4">
-            <div className="text-gray-600">消息状态</div>
-            <div className="mt-1 text-xs text-gray-700">
+          <div className="rounded-xl border border-gray-200 bg-white/50 p-4 dark:border-white/10 dark:bg-slate-900/40">
+            <div className="text-gray-600 dark:text-slate-300">消息状态</div>
+            <div className="mt-1 text-xs text-gray-700 dark:text-slate-200">
               pending={data.messages.pending} · skipped={data.messages.skipped}
             </div>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white/50 p-4">
-            <div className="text-gray-600">任务状态</div>
-            <div className="mt-1 text-xs text-gray-700">
+          <div className="rounded-xl border border-gray-200 bg-white/50 p-4 dark:border-white/10 dark:bg-slate-900/40">
+            <div className="text-gray-600 dark:text-slate-300">任务状态</div>
+            <div className="mt-1 text-xs text-gray-700 dark:text-slate-200">
               pending={data.tasks.pending} · paused={data.tasks.paused} · failed={data.tasks.failed} · completed={data.tasks.completed}
             </div>
           </div>
@@ -345,22 +345,25 @@ export function DashboardSummary() {
       ) : null}
 
       {data?.groups?.length ? (
-        <div className="mt-4 rounded-2xl border border-gray-200 bg-white/50 p-5 text-sm">
-          <div className="font-medium text-gray-900">分组概览</div>
+        <div className="mt-4 rounded-2xl border border-gray-200 bg-white/50 p-5 text-sm dark:border-white/10 dark:bg-slate-900/40">
+          <div className="font-medium text-gray-900 dark:text-slate-100">分组概览</div>
           <div className="mt-3 space-y-2">
             {data.groups.map((g) => {
               const rawName = (g.groupName ?? "").trim();
               const label = rawName ? rawName : "未分组";
               const qs = buildGroupQuery(rawName);
               return (
-                <div key={`${rawName || "__ungrouped__"}`} className="rounded-xl border border-gray-200 bg-white/60 p-4">
+                <div
+                  key={`${rawName || "__ungrouped__"}`}
+                  className="rounded-xl border border-gray-200 bg-white/60 p-4 dark:border-white/10 dark:bg-slate-900/50"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-gray-900">{label}</div>
-                      <div className="mt-1 text-xs text-gray-600">
+                      <div className="font-medium text-gray-900 dark:text-slate-100">{label}</div>
+                      <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                         频道：{g.channels.active}/{g.channels.total} · protected={g.channels.protected}
                       </div>
-                      <div className="mt-1 text-xs text-gray-600">
+                      <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                         任务：running={g.tasks.running} · pending={g.tasks.pending} · paused={g.tasks.paused} · failed={g.tasks.failed}
                       </div>
                     </div>
@@ -395,16 +398,28 @@ export function DashboardSummary() {
               );
             })}
           </div>
-          <div className="mt-3 text-xs text-gray-500">提示：点击上面的“频道/消息/任务/事件”会带上该分组过滤条件。</div>
+          <div className="mt-3 text-xs text-gray-500 dark:text-slate-400">
+            提示：点击上面的“频道/消息/任务/事件”会带上该分组过滤条件。
+          </div>
         </div>
       ) : null}
 
       {data ? (
         <div
-          className={`mt-4 rounded-2xl border p-5 text-sm ${hasErrorChannels ? "border-red-200 bg-red-50/60" : "border-gray-200 bg-white/50"}`}
+          className={`mt-4 rounded-2xl border p-5 text-sm ${
+            hasErrorChannels
+              ? "border-red-200 bg-red-50/60 dark:border-red-500/30 dark:bg-red-500/10"
+              : "border-gray-200 bg-white/50 dark:border-white/10 dark:bg-slate-900/40"
+          }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className={hasErrorChannels ? "font-medium text-red-800" : "font-medium text-gray-900"}>
+            <div
+              className={
+                hasErrorChannels
+                  ? "font-medium text-red-800 dark:text-red-200"
+                  : "font-medium text-gray-900 dark:text-slate-100"
+              }
+            >
               异常频道（syncStatus=error）
             </div>
             <a href="/channels" className="text-xs text-blue-700 hover:underline">
@@ -423,14 +438,14 @@ export function DashboardSummary() {
                   const groupLabel = (c.groupName ?? "").trim() ? c.groupName.trim() : "未分组";
                   const err = c.lastErrorEvent;
                   return (
-                    <div key={c.id} className="rounded-xl border border-red-200 bg-white/70 p-4">
+                    <div key={c.id} className="rounded-xl border border-red-200 bg-white/70 p-4 dark:border-red-500/30 dark:bg-red-500/10">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="font-medium text-red-900">{c.name}</div>
-                          <div className="mt-1 text-xs text-red-900/70">{groupLabel}</div>
-                          <div className="mt-1 text-xs text-red-900/60">{c.channelIdentifier}</div>
+                          <div className="font-medium text-red-900 dark:text-red-100">{c.name}</div>
+                          <div className="mt-1 text-xs text-red-900/70 dark:text-red-200/80">{groupLabel}</div>
+                          <div className="mt-1 text-xs text-red-900/60 dark:text-red-200/70">{c.channelIdentifier}</div>
                           {err ? (
-                            <div className="mt-2 text-xs text-red-800 whitespace-pre-wrap">
+                            <div className="mt-2 text-xs text-red-800 dark:text-red-200 whitespace-pre-wrap">
                               最近错误（{formatTime(err.createdAt)}）：{truncateText(err.message, 160)}
                             </div>
                           ) : null}
@@ -438,13 +453,13 @@ export function DashboardSummary() {
                         <div className="flex flex-wrap gap-2">
                           <a
                             href={`/channels/${encodeURIComponent(c.id)}`}
-                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white/60 text-red-900 hover:bg-red-50"
+                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white/60 text-red-900 hover:bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 dark:hover:bg-red-500/15"
                           >
                             频道详情
                           </a>
                           <a
                             href={`/events?sourceChannelId=${encodeURIComponent(c.id)}&level=error`}
-                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white/60 text-red-900 hover:bg-red-50"
+                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white/60 text-red-900 hover:bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 dark:hover:bg-red-500/15"
                           >
                             错误事件
                           </a>
@@ -452,7 +467,7 @@ export function DashboardSummary() {
                             type="button"
                             onClick={() => recoverErrorChannel({ id: c.id, label: c.channelIdentifier })}
                             disabled={loading || refreshing || recoveringId === c.id}
-                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white text-red-900 hover:bg-red-50"
+                            className="ui-btn h-9 px-3 text-xs border border-red-200 bg-white text-red-900 hover:bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 dark:hover:bg-red-500/15"
                           >
                             {recoveringId === c.id ? "恢复中..." : "恢复"}
                           </button>
@@ -464,15 +479,15 @@ export function DashboardSummary() {
               </div>
             </>
           ) : (
-            <div className="mt-2 text-xs text-gray-600">暂无异常频道（目前没有 syncStatus=error 的频道）。</div>
+            <div className="mt-2 text-xs text-gray-600 dark:text-slate-300">暂无异常频道（目前没有 syncStatus=error 的频道）。</div>
           )}
         </div>
       ) : null}
 
       {data ? (
-        <div className="mt-4 rounded-2xl border border-gray-200 bg-white/50 p-5 text-sm">
+        <div className="mt-4 rounded-2xl border border-gray-200 bg-white/50 p-5 text-sm dark:border-white/10 dark:bg-slate-900/40">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="font-medium text-gray-900">正在运行的任务</div>
+            <div className="font-medium text-gray-900 dark:text-slate-100">正在运行的任务</div>
             <a href="/tasks?status=running" className="text-xs text-blue-700 hover:underline">
               去任务页查看
             </a>
@@ -484,15 +499,15 @@ export function DashboardSummary() {
                 const groupLabel = (t.source.groupName ?? "").trim() ? t.source.groupName.trim() : "未分组";
                 const pct = calcProgressPct(t.progressCurrent, t.progressTotal);
                 return (
-                  <div key={t.id} className="rounded-xl border border-gray-200 bg-white/60 p-4">
+                  <div key={t.id} className="rounded-xl border border-gray-200 bg-white/60 p-4 dark:border-white/10 dark:bg-slate-900/50">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-medium text-gray-900">{t.source.name}</div>
-                        <div className="mt-1 text-xs text-gray-600">
+                        <div className="font-medium text-gray-900 dark:text-slate-100">{t.source.name}</div>
+                        <div className="mt-1 text-xs text-gray-600 dark:text-slate-300">
                           {groupLabel} · {t.taskType} · {t.progressCurrent}/{t.progressTotal ?? "-"}
                           {t.lastProcessedId != null ? ` · lastId=${t.lastProcessedId}` : ""}
                         </div>
-                        <div className="mt-1 text-xs text-gray-500">{t.source.channelIdentifier}</div>
+                        <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">{t.source.channelIdentifier}</div>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <a
@@ -510,7 +525,7 @@ export function DashboardSummary() {
                       </div>
                     </div>
 
-                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/60 border border-white/20">
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/60 border border-white/20 dark:bg-slate-900/40 dark:border-white/10">
                       <div
                         className={`h-full ${pct == null ? "bg-blue-400/40 animate-pulse" : "bg-gradient-to-r from-blue-500 to-purple-600"}`}
                         style={{ width: `${pct ?? 33}%` }}
@@ -521,7 +536,7 @@ export function DashboardSummary() {
               })}
             </div>
           ) : (
-            <div className="mt-3 text-sm text-gray-600">暂无运行中的任务</div>
+            <div className="mt-3 text-sm text-gray-600 dark:text-slate-300">暂无运行中的任务</div>
           )}
         </div>
       ) : null}

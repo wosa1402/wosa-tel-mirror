@@ -9,6 +9,8 @@ import { StringSession } from "telegram/sessions";
 import { getInputMedia } from "telegram/Utils";
 import { sleep } from "./utils/sleep";
 
+const FLOOD_WAIT_AUTO_SLEEP_MAX_SEC = 600;
+
 function getEnv(name: string): string | undefined {
   const value = process.env[name];
   if (!value) return undefined;
@@ -76,7 +78,7 @@ async function ensureMirroredMessageSpoiler(
     await editOnce();
   } catch (error: unknown) {
     const waitSeconds = parseFloodWaitSeconds(error);
-    if (waitSeconds && waitSeconds <= 60) {
+    if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
       await sleep(waitSeconds * 1000);
       await editOnce();
       return;
@@ -241,9 +243,11 @@ function getTelegramErrorMessage(error: unknown): string | undefined {
 
 function parseFloodWaitSeconds(error: unknown): number | null {
   const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : "");
-  const m = msg.match(/^FLOOD_WAIT_(\d+)$/);
-  if (!m) return null;
-  return Number.parseInt(m[1] ?? "", 10);
+  const m1 = msg.match(/^FLOOD_WAIT_(\d+)$/);
+  if (m1) return Number.parseInt(m1[1] ?? "", 10);
+  const m2 = msg.match(/A wait of (\d+) seconds is required/i);
+  if (m2) return Number.parseInt(m2[1] ?? "", 10);
+  return null;
 }
 
 function collectNewMessagesFromUpdatesResult(result: unknown): Api.Message[] {
@@ -271,6 +275,28 @@ function collectNewMessagesFromUpdatesResult(result: unknown): Api.Message[] {
   }
 
   return [...map.values()].sort((a, b) => a.id - b.id);
+}
+
+function collectMessageIdsByRandomIdFromUpdatesResult(result: unknown): Map<string, number> {
+  const updates: unknown[] = [];
+  if (result instanceof Api.UpdateShort) {
+    updates.push(result.update);
+  } else if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+    updates.push(...result.updates);
+  } else {
+    return new Map();
+  }
+
+  const map = new Map<string, number>();
+  for (const update of updates) {
+    if (!(update instanceof Api.UpdateMessageID)) continue;
+    const randomId = (update as any).randomId;
+    if (typeof randomId !== "bigint") continue;
+    if (!update.id) continue;
+    map.set(randomId.toString(), update.id);
+  }
+
+  return map;
 }
 
 function isRetryableCommentThreadError(error: unknown): boolean {
@@ -302,7 +328,7 @@ async function withCommentSendRetry<T>(
     } catch (error: unknown) {
       lastError = error;
       const waitSeconds = parseFloodWaitSeconds(error);
-      if (waitSeconds && waitSeconds <= 60) {
+      if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
         await sleep(waitSeconds * 1000);
         continue;
       }
@@ -333,30 +359,49 @@ async function forwardMessagesAsCopy(
   const fromInput = await client.getInputEntity(fromPeer as any);
   const toInput = await client.getInputEntity(toPeer as any);
 
+  const randomIds = messageIds.map(() => generateRandomBigInt());
   const request = new Api.messages.ForwardMessages({
     fromPeer: fromInput as any,
     toPeer: toInput as any,
     id: messageIds,
-    randomId: messageIds.map(() => generateRandomBigInt()),
+    randomId: randomIds,
     dropAuthor: true,
   });
 
   const result = await client.invoke(request);
   const recovered = collectNewMessagesFromUpdatesResult(result);
-  if (recovered.length) {
-    if (recovered.length !== messageIds.length) {
-      console.warn(
-        `ForwardMessages recovered ${recovered.length}/${messageIds.length} message(s) from updates; mapping may be approximate.`,
-      );
-    }
-    const sliced = recovered.length > messageIds.length ? recovered.slice(recovered.length - messageIds.length) : recovered;
-    return messageIds.map((_, idx) => sliced[idx]);
-  }
+  const recoveredById = new Map<number, Api.Message>();
+  for (const msg of recovered) recoveredById.set(msg.id, msg);
 
-  const parsed = client._getResponseMessage(request as any, result as any, toInput as any);
-  if (Array.isArray(parsed)) return parsed.map((m) => (m instanceof Api.Message ? m : undefined));
-  if (parsed instanceof Api.Message) return [parsed];
-  return messageIds.map(() => undefined);
+  const idsByRandomId = collectMessageIdsByRandomIdFromUpdatesResult(result);
+
+  const fallback = (() => {
+    if (recovered.length) {
+      if (recovered.length !== messageIds.length) {
+        console.warn(
+          `ForwardMessages recovered ${recovered.length}/${messageIds.length} message(s) from updates; mapping may be approximate.`,
+        );
+      }
+      const sliced = recovered.length > messageIds.length ? recovered.slice(recovered.length - messageIds.length) : recovered;
+      return messageIds.map((_, idx) => sliced[idx]);
+    }
+
+    const parsed = client._getResponseMessage(request as any, result as any, toInput as any);
+    if (Array.isArray(parsed)) return parsed.map((m) => (m instanceof Api.Message ? m : undefined));
+    if (parsed instanceof Api.Message) return [parsed];
+    return messageIds.map(() => undefined);
+  })();
+
+  if (!idsByRandomId.size) return fallback;
+
+  const mapped = messageIds.map((_, idx) => {
+    const id = idsByRandomId.get(randomIds[idx]?.toString() ?? "");
+    if (!id) return undefined;
+    return recoveredById.get(id) ?? ({ id } as any as Api.Message);
+  });
+
+  if (!mapped.some(Boolean)) return fallback;
+  return messageIds.map((_, idx) => mapped[idx] ?? fallback[idx]);
 }
 
 async function fetchMessage(client: TelegramClient, sourceEntity: unknown, messageId: number): Promise<Api.Message | null> {

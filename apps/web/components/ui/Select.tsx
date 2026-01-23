@@ -67,16 +67,16 @@ export function Select({
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         disabled={disabled}
         className={clsx(
-          "w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl",
+          "w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl dark:bg-slate-900/40 dark:border-white/10",
           "flex items-center justify-between transition-all",
           "focus:outline-none focus:ring-2 focus:ring-blue-500",
-          disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white cursor-pointer",
+          disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white dark:hover:bg-slate-900/60 cursor-pointer",
         )}
       >
-        <span className="text-sm text-gray-900">{selectedOption?.label || placeholder}</span>
+        <span className="text-sm text-gray-900 dark:text-slate-100">{selectedOption?.label || placeholder}</span>
         <ChevronDown
           className={clsx(
-            "w-5 h-5 text-gray-400 transition-transform duration-200",
+            "w-5 h-5 text-gray-400 dark:text-slate-400 transition-transform duration-200",
             isOpen && "rotate-180",
           )}
         />
@@ -94,7 +94,7 @@ export function Select({
                   "w-full px-4 py-2.5 text-left text-sm transition-colors",
                   selectedValue === option.value
                     ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                    : "text-gray-700 hover:bg-white/60",
+                    : "text-gray-700 hover:bg-white/60 dark:text-slate-200 dark:hover:bg-slate-800/60",
                 )}
               >
                 {option.label}
@@ -106,4 +106,3 @@ export function Select({
     </div>
   );
 }
-

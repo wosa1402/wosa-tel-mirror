@@ -60,22 +60,22 @@ const iconMap: Record<EventLevel, typeof Info> = {
 
 const colorMap: Record<EventLevel, { bg: string; text: string; icon: string; border: string }> = {
   info: {
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    icon: "text-blue-500",
-    border: "border-blue-200",
+    bg: "bg-blue-100 dark:bg-blue-500/15",
+    text: "text-blue-700 dark:text-blue-200",
+    icon: "text-blue-600 dark:text-blue-300",
+    border: "border-blue-200 dark:border-blue-500/30",
   },
   warn: {
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-    icon: "text-orange-500",
-    border: "border-orange-200",
+    bg: "bg-orange-100 dark:bg-orange-500/15",
+    text: "text-orange-700 dark:text-orange-200",
+    icon: "text-orange-600 dark:text-orange-300",
+    border: "border-orange-200 dark:border-orange-500/30",
   },
   error: {
-    bg: "bg-red-50",
-    text: "text-red-700",
-    icon: "text-red-500",
-    border: "border-red-200",
+    bg: "bg-red-100 dark:bg-red-500/15",
+    text: "text-red-700 dark:text-red-200",
+    icon: "text-red-600 dark:text-red-300",
+    border: "border-red-200 dark:border-red-500/30",
   },
 };
 
@@ -460,14 +460,14 @@ export function EventsManager({
             />
           </div>
 
-          <div className="rounded-md border border-black/10 bg-black/5 p-3 text-sm">
+          <div className="rounded-md border border-black/10 bg-black/5 p-3 text-sm dark:border-white/10 dark:bg-white/5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="font-medium">我的预设（保存到服务器）</div>
               <button
                 type="button"
                 onClick={() => saveCurrentAsPreset()}
                 disabled={loading}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
               >
                 保存当前为预设
               </button>
@@ -476,12 +476,12 @@ export function EventsManager({
             {savedPresets.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {savedPresets.map((p) => (
-                  <div key={p.id} className="inline-flex overflow-hidden rounded-md border border-black/10 bg-white">
+                  <div key={p.id} className="inline-flex overflow-hidden rounded-md border border-black/10 bg-white dark:border-white/10 dark:bg-slate-900/40">
                     <button
                       type="button"
                       onClick={() => applyPresetQueryString(p.query)}
                       disabled={loading}
-                      className="inline-flex h-8 items-center justify-center px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                      className="inline-flex h-8 items-center justify-center px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:text-slate-100 dark:hover:bg-white/10"
                       title={p.query}
                     >
                       {p.name}
@@ -490,7 +490,7 @@ export function EventsManager({
                       type="button"
                       onClick={() => deletePreset(p.id)}
                       disabled={loading}
-                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50"
+                      className="inline-flex h-8 items-center justify-center border-l border-black/10 px-2 text-xs text-black/50 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/10"
                       title="删除这个预设"
                     >
                       ×
@@ -499,17 +499,17 @@ export function EventsManager({
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-xs text-black/60">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
+              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">暂无预设：先把筛选条件调好，再点“保存当前为预设”。</div>
             )}
 
-            <div className="mt-3 border-t border-black/10 pt-3">
+            <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
               <div className="font-medium">内置快捷（点一下就查询）</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => applyPreset({ level: "error" })}
                   disabled={loading}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   仅 error
                 </button>
@@ -517,7 +517,7 @@ export function EventsManager({
                   type="button"
                   onClick={() => applyPreset({ level: "warn" })}
                   disabled={loading}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   仅 warn
                 </button>
@@ -525,7 +525,7 @@ export function EventsManager({
                   type="button"
                   onClick={() => applyPreset({ level: "info" })}
                   disabled={loading}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs hover:bg-black/5 disabled:opacity-50"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-black/10 bg-white px-3 text-xs text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   仅 info
                 </button>
@@ -581,7 +581,7 @@ export function EventsManager({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="ui-section-title">事件列表</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
               {channelLabel} · {events.length ? `已加载 ${events.length} 条` : "暂无数据（先点击“查询”）"}
             </p>
           </div>
@@ -615,7 +615,7 @@ export function EventsManager({
 
         <div className="mt-4 space-y-3">
           {!events.length ? (
-            <div className="text-sm text-gray-600">{loading ? "加载中..." : "暂无事件"}</div>
+            <div className="text-sm text-gray-600 dark:text-slate-300">{loading ? "加载中..." : "暂无事件"}</div>
           ) : (
             events.map((e) => {
               const Icon = iconMap[e.level];
@@ -646,7 +646,7 @@ export function EventsManager({
                     <div className="flex-1 min-w-0 space-y-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-gray-900">{title}</h3>
+                          <h3 className="font-semibold text-gray-900 dark:text-slate-100">{title}</h3>
                           <span
                             className={clsx(
                               "px-2 py-0.5 text-xs rounded-full font-medium",
@@ -657,11 +657,11 @@ export function EventsManager({
                             {e.level.toUpperCase()}
                           </span>
                         </div>
-                        {detail ? <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{detail}</p> : null}
+                        {detail ? <p className="text-sm text-gray-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{detail}</p> : null}
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span className="font-medium text-gray-700">{channelText}</span>
+                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-slate-400">
+                        <span className="font-medium text-gray-700 dark:text-slate-200">{channelText}</span>
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {formatTime(e.createdAt)}
