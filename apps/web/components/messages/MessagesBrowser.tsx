@@ -394,6 +394,8 @@ export function MessagesBrowser() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const scope = (params.get("scope") ?? "").trim().toLowerCase();
+    const initialAllChannels = scope === "all";
     const initialChannelId = params.get("sourceChannelId")?.trim() ?? "";
     const hasGroupParam = params.has("groupName") || params.has("group_name");
     const initialGroupRaw = (params.get("groupName") ?? params.get("group_name") ?? "").trim();
@@ -468,6 +470,11 @@ export function MessagesBrowser() {
           return;
         }
 
+        if (initialAllChannels) {
+          setSelectedChannelId("");
+          return;
+        }
+
         const fallback = rows.length ? rows[0]!.id : "";
         if (fallback) setSelectedChannelId(fallback);
       })
@@ -475,14 +482,14 @@ export function MessagesBrowser() {
   }, []);
 
   useEffect(() => {
-    if (!selectedChannelId && !groupFilter.trim()) return;
+    if (!selectedChannelId && !groupFilter.trim() && channels.length === 0) return;
     if (!autoFetchPending.current) return;
     if (didAutoFetch.current) return;
     didAutoFetch.current = true;
     autoFetchPending.current = false;
     fetchMessages({ reset: true }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, groupFilter]);
+  }, [selectedChannelId, groupFilter, channels.length]);
 
   useEffect(() => {
     if (selectedChannelId !== "") return;

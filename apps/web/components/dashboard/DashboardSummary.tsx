@@ -242,7 +242,7 @@ export function DashboardSummary() {
       { label: "受保护", value: channels ? String(channels.protected) : "-", hint: "protected" },
       { label: "消息", value: messages ? String(messages.total) : "-", hint: "total" },
       { label: "成功", value: messages ? String(messages.success) : "-", hint: "success" },
-      { label: "失败", value: messages ? String(messages.failed) : "-", hint: "failed" },
+      { label: "失败", value: messages ? String(messages.failed) : "-", hint: "failed", href: "/messages?status=failed&scope=all" },
       { label: "任务运行中", value: tasks ? String(tasks.running) : "-", hint: "running" },
       { label: "同步服务", value: mirror ? (mirror.online ? "在线" : "离线") : "-", hint: mirrorHint },
     ];
@@ -318,13 +318,26 @@ export function DashboardSummary() {
       ) : null}
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
-        {cards.map((c) => (
-          <div key={c.label} className="rounded-xl border border-gray-200 bg-white/50 p-4 dark:border-white/10 dark:bg-slate-900/40">
-            <div className="text-gray-600 dark:text-slate-300">{c.label}</div>
-            <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-slate-100">{c.value}</div>
-            <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">{c.hint}</div>
-          </div>
-        ))}
+        {cards.map((c) =>
+          c.href ? (
+            <a
+              key={c.label}
+              href={c.href}
+              className="rounded-xl border border-gray-200 bg-white/50 p-4 transition-colors hover:bg-white/60 dark:border-white/10 dark:bg-slate-900/40 dark:hover:bg-slate-900/50"
+              title="点击跳转查看详情"
+            >
+              <div className="text-gray-600 dark:text-slate-300">{c.label}</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-slate-100">{c.value}</div>
+              <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">{c.hint}</div>
+            </a>
+          ) : (
+            <div key={c.label} className="rounded-xl border border-gray-200 bg-white/50 p-4 dark:border-white/10 dark:bg-slate-900/40">
+              <div className="text-gray-600 dark:text-slate-300">{c.label}</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900 dark:text-slate-100">{c.value}</div>
+              <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">{c.hint}</div>
+            </div>
+          ),
+        )}
       </div>
 
       {data ? (
