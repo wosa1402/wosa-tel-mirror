@@ -2402,6 +2402,29 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
     }
   }
 
+  let snapshotLatestId: number | null = null;
+  try {
+    const latestList = await client.getMessages(sourceEntity, { limit: 1 });
+    const latest = (latestList as any)?.[0];
+    if (latest instanceof Api.Message && typeof latest.id === "number" && latest.id > 0) {
+      snapshotLatestId = latest.id;
+      console.log(`history_full snapshot latest source message id: ${snapshotLatestId}`);
+      await logSyncEvent({
+        sourceChannelId: source.id,
+        level: "info",
+        message: `history_full snapshot latestId=${snapshotLatestId} (taskId=${taskId})`,
+      });
+    }
+  } catch (error: unknown) {
+    const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+    console.warn(`failed to fetch history_full snapshot latest message id: ${msg}`);
+    await logSyncEvent({
+      sourceChannelId: source.id,
+      level: "warn",
+      message: `failed to fetch history_full snapshot latest message id: ${msg} (taskId=${taskId})`,
+    });
+  }
+
   let progressCurrent = task.progressCurrent ?? 0;
   let lastProcessedId = task.lastProcessedId ?? 0;
 
@@ -2812,122 +2835,176 @@ async function processHistoryFullTask(client: TelegramClient, taskId: string, so
     return "ok";
   };
 
-  for await (const msg of client.iterMessages(sourceEntity, { reverse: true, minId: lastProcessedId, waitTime: 1 })) {
-    if (!(await ensureActiveOrPause())) return;
-    if (!(msg instanceof Api.Message)) continue;
-    if (!msg.id) continue;
-    if (lastProcessedId && msg.id <= lastProcessedId) continue;
+  let lastUnexpectedEndAt = 0;
 
-    const groupId = mode === "forward" && mirrorBehavior.groupMediaMessages && msg.groupedId ? String(msg.groupedId) : null;
-    if (pending.length && pendingGroupId !== groupId) {
-      const result = await flushPending();
-      if (result === "paused") return;
-    }
+  for (;;) {
+    const roundStartedAt = Date.now();
+    const roundStartProgress = progressCurrent;
+    const roundStartLastId = lastProcessedId;
 
-    const sentAt = new Date(msg.date * 1000);
-    const text = typeof msg.message === "string" ? msg.message : "";
-    const textPreview = text.length > 200 ? `${text.slice(0, 200)}` : text;
-    const messageType = messageTypeFromMessage(msg);
-    const mediaGroupId = msg.groupedId ? String(msg.groupedId) : null;
-    const hasMedia = !!msg.media;
-    const fileSize = extractMediaFileSize(msg);
+    for await (const msg of client.iterMessages(sourceEntity, { reverse: true, minId: lastProcessedId, waitTime: 1 })) {
+      if (!(await ensureActiveOrPause())) return;
+      if (!(msg instanceof Api.Message)) continue;
+      if (!msg.id) continue;
+      if (lastProcessedId && msg.id <= lastProcessedId) continue;
 
-    let status: (typeof schema.messageStatusEnum.enumValues)[number] = "pending";
-    let skipReason: (typeof schema.skipReasonEnum.enumValues)[number] | null = null;
-    let errorMessage: string | null = null;
-    let mirroredAt: Date | null = null;
+      const groupId = mode === "forward" && mirrorBehavior.groupMediaMessages && msg.groupedId ? String(msg.groupedId) : null;
+      if (pending.length && pendingGroupId !== groupId) {
+        const result = await flushPending();
+        if (result === "paused") return;
+      }
 
-    if (hasMedia) {
-      if (messageType === "video" && !mirrorBehavior.mirrorVideos) {
-        status = "skipped";
-        skipReason = "unsupported_type";
-        errorMessage = "skipped: video disabled by settings";
-        mirroredAt = new Date();
-      } else if (
-        mirrorBehavior.maxFileSizeBytes != null &&
-        fileSize != null &&
-        Number.isFinite(fileSize) &&
-        fileSize > mirrorBehavior.maxFileSizeBytes
-      ) {
-        status = "skipped";
-        skipReason = "file_too_large";
-        errorMessage = `skipped: file too large (${Math.ceil(fileSize / 1024 / 1024)}MB > ${mirrorBehavior.maxFileSizeMb}MB)`;
-        mirroredAt = new Date();
+      const sentAt = new Date(msg.date * 1000);
+      const text = typeof msg.message === "string" ? msg.message : "";
+      const textPreview = text.length > 200 ? `${text.slice(0, 200)}` : text;
+      const messageType = messageTypeFromMessage(msg);
+      const mediaGroupId = msg.groupedId ? String(msg.groupedId) : null;
+      const hasMedia = !!msg.media;
+      const fileSize = extractMediaFileSize(msg);
+
+      let status: (typeof schema.messageStatusEnum.enumValues)[number] = "pending";
+      let skipReason: (typeof schema.skipReasonEnum.enumValues)[number] | null = null;
+      let errorMessage: string | null = null;
+      let mirroredAt: Date | null = null;
+
+      if (hasMedia) {
+        if (messageType === "video" && !mirrorBehavior.mirrorVideos) {
+          status = "skipped";
+          skipReason = "unsupported_type";
+          errorMessage = "skipped: video disabled by settings";
+          mirroredAt = new Date();
+        } else if (
+          mirrorBehavior.maxFileSizeBytes != null &&
+          fileSize != null &&
+          Number.isFinite(fileSize) &&
+          fileSize > mirrorBehavior.maxFileSizeBytes
+        ) {
+          status = "skipped";
+          skipReason = "file_too_large";
+          errorMessage = `skipped: file too large (${Math.ceil(fileSize / 1024 / 1024)}MB > ${mirrorBehavior.maxFileSizeMb}MB)`;
+          mirroredAt = new Date();
+        }
+      }
+
+      const inserted = await withDbRetry(
+        () =>
+          db
+            .insert(schema.messageMappings)
+            .values({
+              sourceChannelId: source.id,
+              sourceMessageId: msg.id,
+              mirrorChannelId: mirror.id,
+              messageType,
+              mediaGroupId,
+              status,
+              skipReason,
+              errorMessage,
+              hasMedia,
+              fileSize: fileSize ?? null,
+              text: text || null,
+              textPreview: textPreview || null,
+              sentAt,
+              mirroredAt,
+            })
+            .onConflictDoNothing()
+            .returning({ id: schema.messageMappings.id, status: schema.messageMappings.status }),
+        `history_full upsert message_mapping (taskId=${taskId}, msgId=${msg.id})`,
+        { attempts: 3, baseDelayMs: 250 },
+      );
+
+      let mappingId: string | null = inserted[0]?.id ?? null;
+      let mappingStatus: (typeof schema.messageStatusEnum.enumValues)[number] | null = inserted[0]?.status ?? null;
+
+      if (!mappingId) {
+        const [existing] = await withDbRetry(
+          () =>
+            db
+              .select({ id: schema.messageMappings.id, status: schema.messageMappings.status })
+              .from(schema.messageMappings)
+              .where(and(eq(schema.messageMappings.sourceChannelId, source.id), eq(schema.messageMappings.sourceMessageId, msg.id)))
+              .limit(1),
+          `history_full lookup message_mapping (taskId=${taskId}, msgId=${msg.id})`,
+          { attempts: 3, baseDelayMs: 250 },
+        );
+        mappingId = existing?.id ?? null;
+        mappingStatus = existing?.status ?? null;
+      }
+
+      if (!mappingId || !mappingStatus) {
+        await advanceProgressFor(msg.id);
+        continue;
+      }
+
+      if (mappingStatus === "success" || mappingStatus === "skipped") {
+        await advanceProgressFor(msg.id);
+        continue;
+      }
+
+      pendingGroupId = groupId;
+      pending.push({ msg, mappingId });
+
+      if (!groupId) {
+        const result = await flushPending();
+        if (result === "paused") return;
       }
     }
 
-    const inserted = await withDbRetry(
-      () =>
-        db
-          .insert(schema.messageMappings)
-          .values({
-            sourceChannelId: source.id,
-            sourceMessageId: msg.id,
-            mirrorChannelId: mirror.id,
-            messageType,
-            mediaGroupId,
-            status,
-            skipReason,
-            errorMessage,
-            hasMedia,
-            fileSize: fileSize ?? null,
-            text: text || null,
-            textPreview: textPreview || null,
-            sentAt,
-            mirroredAt,
-          })
-          .onConflictDoNothing()
-          .returning({ id: schema.messageMappings.id, status: schema.messageMappings.status }),
-      `history_full upsert message_mapping (taskId=${taskId}, msgId=${msg.id})`,
+    const finalResult = await flushPending();
+    if (finalResult === "paused") return;
+
+    await withDbRetry(
+      () => db.update(schema.syncTasks).set({ progressCurrent, lastProcessedId }).where(eq(schema.syncTasks.id, taskId)),
+      `history_full finalize progress (taskId=${taskId})`,
       { attempts: 3, baseDelayMs: 250 },
     );
+    void notifyTasksChanged({ taskId, sourceChannelId: source.id, taskType: "history_full" });
 
-    let mappingId: string | null = inserted[0]?.id ?? null;
-    let mappingStatus: (typeof schema.messageStatusEnum.enumValues)[number] | null = inserted[0]?.status ?? null;
-
-    if (!mappingId) {
-      const [existing] = await withDbRetry(
-        () =>
-          db
-            .select({ id: schema.messageMappings.id, status: schema.messageMappings.status })
-            .from(schema.messageMappings)
-            .where(and(eq(schema.messageMappings.sourceChannelId, source.id), eq(schema.messageMappings.sourceMessageId, msg.id)))
-            .limit(1),
-        `history_full lookup message_mapping (taskId=${taskId}, msgId=${msg.id})`,
-        { attempts: 3, baseDelayMs: 250 },
-      );
-      mappingId = existing?.id ?? null;
-      mappingStatus = existing?.status ?? null;
+    if (snapshotLatestId == null) {
+      try {
+        const latestList = await client.getMessages(sourceEntity, { limit: 1 });
+        const latest = (latestList as any)?.[0];
+        if (latest instanceof Api.Message && typeof latest.id === "number" && latest.id > 0) {
+          snapshotLatestId = latest.id;
+          console.log(`history_full snapshot latest source message id: ${snapshotLatestId}`);
+          await logSyncEvent({
+            sourceChannelId: source.id,
+            level: "info",
+            message: `history_full snapshot latestId=${snapshotLatestId} (taskId=${taskId})`,
+          });
+        }
+      } catch {
+        // ignore
+      }
     }
 
-    if (!mappingId || !mappingStatus) {
-      await advanceProgressFor(msg.id);
-      continue;
+    const remainingByProgress =
+      typeof progressTotal === "number" && Number.isFinite(progressTotal) ? Math.max(0, progressTotal - progressCurrent) : null;
+    const remainingById =
+      typeof snapshotLatestId === "number" && Number.isFinite(snapshotLatestId) && snapshotLatestId > 0
+        ? Math.max(0, snapshotLatestId - lastProcessedId)
+        : null;
+
+    const looksIncomplete = (remainingById != null && remainingById > 0) || (remainingByProgress != null && remainingByProgress > 0);
+    if (!looksIncomplete) break;
+
+    const progressedThisRound = progressCurrent > roundStartProgress || lastProcessedId > roundStartLastId;
+    const details = `history_full seems incomplete; auto continuing (taskId=${taskId}) progress=${progressCurrent}/${progressTotal ?? "-"} lastId=${lastProcessedId}${snapshotLatestId ? ` snapshotLatestId=${snapshotLatestId}` : ""}`;
+
+    if (!progressedThisRound) {
+      await pauseTask(taskId, `${details} (no progress in last round)`, { progressCurrent, progressTotal, lastProcessedId });
+      return;
     }
 
-    if (mappingStatus === "success" || mappingStatus === "skipped") {
-      await advanceProgressFor(msg.id);
-      continue;
+    console.warn(details);
+
+    if (roundStartedAt - lastUnexpectedEndAt > 60_000) {
+      lastUnexpectedEndAt = roundStartedAt;
+      await logSyncEvent({ sourceChannelId: source.id, level: "warn", message: details });
     }
 
-    pendingGroupId = groupId;
-    pending.push({ msg, mappingId });
-
-    if (!groupId) {
-      const result = await flushPending();
-      if (result === "paused") return;
-    }
+    if (!(await ensureActiveOrPause())) return;
+    await sleep(1000);
   }
-
-  const finalResult = await flushPending();
-  if (finalResult === "paused") return;
-
-  await withDbRetry(
-    () => db.update(schema.syncTasks).set({ progressCurrent, lastProcessedId }).where(eq(schema.syncTasks.id, taskId)),
-    `history_full finalize progress (taskId=${taskId})`,
-    { attempts: 3, baseDelayMs: 250 },
-  );
-  void notifyTasksChanged({ taskId, sourceChannelId: source.id, taskType: "history_full" });
 
   await withDbRetry(
     () =>
