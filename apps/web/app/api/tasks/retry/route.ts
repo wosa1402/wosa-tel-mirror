@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db, schema, sqlClient } from "@tg-back/db";
+import { db, schema, sqlClient, TASKS_NOTIFY_CHANNEL } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString } from "@/lib/utils";
 
 loadEnv();
-
-const TASKS_NOTIFY_CHANNEL = "tg_back_sync_tasks_v1";
-
-function getTrimmedString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -117,22 +112,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const [task] = await db
+    const inserted = await db
       .insert(schema.syncTasks)
       .values({
         sourceChannelId: channelId,
         taskType: "retry_failed",
         status: "pending",
       })
+      .onConflictDoNothing()
       .returning({ id: schema.syncTasks.id });
 
-    if (task?.id) {
+    let taskId = inserted[0]?.id ?? null;
+    if (!taskId) {
+      const [row] = await db
+        .select({ id: schema.syncTasks.id })
+        .from(schema.syncTasks)
+        .where(and(eq(schema.syncTasks.sourceChannelId, channelId), eq(schema.syncTasks.taskType, "retry_failed")))
+        .limit(1);
+      taskId = row?.id ?? null;
+    }
+
+    if (taskId) {
       try {
         await sqlClient.notify(
           TASKS_NOTIFY_CHANNEL,
           JSON.stringify({
             ts: new Date().toISOString(),
-            taskId: task.id,
+            taskId,
             sourceChannelId: channelId,
             taskType: "retry_failed",
             status: "pending",
@@ -146,14 +152,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: `Retry task created (${failedCount} failed messages)`,
-        taskId: task?.id ?? null,
+        taskId,
         taskCreated: true,
       },
       { status: 201 },
     );
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "重试失败消息任务创建失败") }, { status: 500 });
   }
 }

@@ -4,6 +4,8 @@ import fsSync from "node:fs";
 import path from "node:path";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
 
@@ -16,17 +18,6 @@ function findRepoRoot(startDir: string): string | null {
     current = parent;
   }
   return null;
-}
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
 }
 
 function resolveLogFilePath(raw: string): string {
@@ -96,7 +87,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "读取日志失败") }, { status: 500 });
   }
 }

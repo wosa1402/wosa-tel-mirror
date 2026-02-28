@@ -5,22 +5,13 @@ import { StringSession } from "telegram/sessions";
 import { loadEnv } from "@/lib/env";
 import { cleanupExpiredSessions, loginSessions } from "@/lib/telegram-login";
 import { requireApiAuth } from "@/lib/api-auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getErrorMessage } from "@/lib/utils";
 
 loadEnv();
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "errorMessage" in error) {
-    const maybeErrorMessage = (error as { errorMessage?: unknown }).errorMessage;
-    if (typeof maybeErrorMessage === "string") return maybeErrorMessage;
-  }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
+const TELEGRAM_API_ID = Number(process.env.TELEGRAM_API_ID);
+const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH?.trim() ?? "";
 
 export async function POST(request: NextRequest) {
   const authError = await requireApiAuth(request);
@@ -31,10 +22,25 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const phoneNumber = typeof body.phoneNumber === "string" ? body.phoneNumber.trim() : "";
 
-  const apiId = Number(process.env.TELEGRAM_API_ID);
-  const apiHash = process.env.TELEGRAM_API_HASH?.trim() ?? "";
+  const ip = getClientIp(request);
+  const ipLimiter = checkRateLimit(`telegram:send_code:ip:${ip}`, { windowMs: 10 * 60 * 1000, max: 5 });
+  if (!ipLimiter.allowed) {
+    const res = NextResponse.json({ error: "Too many requests, please try again later" }, { status: 429 });
+    res.headers.set("Retry-After", String(ipLimiter.retryAfterSec));
+    return res;
+  }
 
-  if (!apiId || !apiHash) {
+  if (phoneNumber) {
+    const phoneHash = crypto.createHash("sha256").update(phoneNumber, "utf8").digest("hex").slice(0, 32);
+    const phoneLimiter = checkRateLimit(`telegram:send_code:phone:${phoneHash}`, { windowMs: 10 * 60 * 1000, max: 3 });
+    if (!phoneLimiter.allowed) {
+      const res = NextResponse.json({ error: "Too many requests, please try again later" }, { status: 429 });
+      res.headers.set("Retry-After", String(phoneLimiter.retryAfterSec));
+      return res;
+    }
+  }
+
+  if (!TELEGRAM_API_ID || !TELEGRAM_API_HASH) {
     return NextResponse.json(
       { error: "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in environment variables" },
       { status: 500 },
@@ -46,10 +52,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 3 });
+    const client = new TelegramClient(new StringSession(""), TELEGRAM_API_ID, TELEGRAM_API_HASH, { connectionRetries: 3 });
     await client.connect();
 
-    const result = await client.sendCode({ apiId, apiHash }, phoneNumber);
+    const result = await client.sendCode({ apiId: TELEGRAM_API_ID, apiHash: TELEGRAM_API_HASH }, phoneNumber);
 
     const loginId = crypto.randomUUID();
     loginSessions.set(loginId, {

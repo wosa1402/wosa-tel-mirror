@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { getTrimmedString } from "@/lib/utils";
 
 loadEnv();
 
@@ -24,11 +25,6 @@ type PresetsByScope = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function getTrimmedString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
 }
 
 function safeParsePresetList(input: unknown): QueryPreset[] {
@@ -101,4 +97,3 @@ export async function GET(request: NextRequest) {
     },
   });
 }
-

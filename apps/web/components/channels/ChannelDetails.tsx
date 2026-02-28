@@ -6,6 +6,7 @@ import { EventsFeed } from "@/components/events/EventsFeed";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { buildTelegramChannelLink } from "@/lib/telegram-links";
+import { calcProgressPct, formatTime, getErrorMessage } from "@/lib/utils";
 
 type MirrorMode = "forward" | "copy";
 type MessageFilterMode = "inherit" | "disabled" | "custom";
@@ -85,29 +86,6 @@ type ChannelRow = {
       }
     | null;
 };
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
-
-function calcProgressPct(current: number, total: number | null): number | null {
-  if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return null;
-  if (!Number.isFinite(current) || current <= 0) return 0;
-  return Math.max(0, Math.min(100, (current / total) * 100));
-}
 
 function truncateText(value: string, maxLen: number): string {
   const text = value.trim();

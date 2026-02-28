@@ -1,43 +1,17 @@
 import { NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
-import { db, listenSqlClient, schema } from "@tg-back/db";
+import { db, listenSqlClient, schema, TASKS_NOTIFY_CHANNEL } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { getErrorMessage, getTrimmedString, parseEnumValue, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TASKS_NOTIFY_CHANNEL = "tg_back_sync_tasks_v1";
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function parseEnumValue<T extends readonly string[]>(allowed: T, value: string): T[number] | null {
-  return (allowed as readonly string[]).includes(value) ? (value as T[number]) : null;
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
 }
 
 async function queryTasks(args: {
@@ -182,7 +156,19 @@ export async function GET(request: NextRequest) {
         safeClose();
       };
 
+      let resolveAborted: (() => void) | null = null;
+      const aborted = new Promise<void>((resolve) => {
+        resolveAborted = resolve;
+      });
+      const triggerAborted = () => {
+        if (!resolveAborted) return;
+        resolveAborted();
+        resolveAborted = null;
+      };
+      if (request.signal.aborted) triggerAborted();
+
       const abortHandler = () => {
+        triggerAborted();
         void cleanup();
       };
       request.signal.addEventListener("abort", abortHandler);
@@ -197,7 +183,7 @@ export async function GET(request: NextRequest) {
           lastSendAt = Date.now();
           sendEvent("tasks", { ts: new Date().toISOString(), tasks });
         } catch (error: unknown) {
-          sendEvent("server_error", { error: toErrorMessage(error) });
+          sendEvent("server_error", { error: getErrorMessage(error) });
         }
       };
 
@@ -248,11 +234,9 @@ export async function GET(request: NextRequest) {
             sendEvent("ping", { ts: new Date().toISOString() });
           }, 25_000);
 
-          while (!request.signal.aborted && !closed) {
-            await new Promise((r) => setTimeout(r, 250));
-          }
+          await aborted;
         } catch (error: unknown) {
-          sendEvent("server_error", { error: toErrorMessage(error) });
+          sendEvent("server_error", { error: getErrorMessage(error) });
           await cleanup();
         } finally {
           request.signal.removeEventListener("abort", abortHandler);

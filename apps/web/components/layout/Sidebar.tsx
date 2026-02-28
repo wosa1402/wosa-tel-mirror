@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { Activity, FileText, Home, ListTodo, MessageSquare, Radio, Send, Settings } from "lucide-react";
+import { formatTime } from "@/lib/utils";
 
 type NavItem = { name: string; href: string };
 
@@ -30,13 +31,6 @@ function formatLag(lagSec: number | null | undefined): string {
   if (lagSec < 60) return `lag ${Math.round(lagSec)}s`;
   const mins = Math.round(lagSec / 60);
   return `lag ${mins}m`;
-}
-
-function formatTime(value: string | null | undefined): string {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
 }
 
 function isActivePath(pathname: string, href: string): boolean {

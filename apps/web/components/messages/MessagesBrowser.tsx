@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { type LocalQueryPreset } from "@/lib/local-presets";
 import { deleteQueryPreset, loadQueryPresets, saveQueryPreset } from "@/lib/query-presets";
+import { formatTime, getErrorMessage } from "@/lib/utils";
 
 type MessageStatus = "pending" | "success" | "failed" | "skipped";
 type MessageType =
@@ -135,22 +136,6 @@ type Cursor = {
   sourceChannelId: string;
   sourceMessageId: number;
 } | null;
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
 
 function formatFileSize(bytes: number | null): string | null {
   if (bytes == null) return null;

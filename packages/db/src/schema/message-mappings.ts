@@ -67,6 +67,7 @@ export const messageMappings = pgTable(
   (table) => ({
     uniqueSourceMessage: uniqueIndex("unique_source_message").on(table.sourceChannelId, table.sourceMessageId),
     channelSentAtIdx: index("channel_sent_at_idx").on(table.sourceChannelId, table.sentAt),
+    sentChannelMessageIdx: index("sent_channel_message_idx").on(table.sentAt, table.sourceChannelId, table.sourceMessageId),
     statusChannelIdx: index("status_channel_idx").on(table.status, table.sourceChannelId),
     mediaGroupIdx: index("media_group_idx").on(table.mediaGroupId),
   }),

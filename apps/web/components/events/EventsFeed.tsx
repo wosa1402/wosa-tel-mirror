@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { AlertCircle, Clock, Info, XCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
+import { formatTime, getErrorMessage } from "@/lib/utils";
 
 type EventLevel = "info" | "warn" | "error";
 
@@ -23,22 +24,6 @@ type EventRow = {
       }
     | null;
 };
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
 
 const iconMap: Record<EventLevel, typeof Info> = {
   info: Info,

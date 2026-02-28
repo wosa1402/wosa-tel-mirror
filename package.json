@@ -13,7 +13,8 @@
     "start:web": "pnpm -C apps/web start",
     "start:mirror": "pnpm -C apps/mirror-service start",
     "start:all": "node scripts/run-all.mjs start",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

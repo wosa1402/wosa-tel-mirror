@@ -1,18 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 
 type Status = { enabled: boolean; authed: boolean };
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
 
 export function AccessGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status | null>(null);

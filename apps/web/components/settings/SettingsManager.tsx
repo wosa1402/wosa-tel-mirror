@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
+import { getErrorMessage } from "@/lib/utils";
 
 type MirrorMode = "forward" | "copy";
 
@@ -28,6 +29,7 @@ type Settings = {
   max_file_size_mb: number;
   skip_protected_content: boolean;
   group_media_messages: boolean;
+  media_group_buffer_ms: number;
 
   message_filter_enabled: boolean;
   message_filter_keywords: string;
@@ -50,19 +52,10 @@ const DEFAULTS: Settings = {
   max_file_size_mb: 100,
   skip_protected_content: true,
   group_media_messages: true,
+  media_group_buffer_ms: 1500,
   message_filter_enabled: false,
   message_filter_keywords: "",
 };
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
 
 function toBool(value: unknown, fallback: boolean): boolean {
   if (typeof value === "boolean") return value;
@@ -103,6 +96,10 @@ function parseSettings(value: unknown): Settings {
     max_file_size_mb: Math.max(0, Math.floor(toNum(obj.max_file_size_mb, DEFAULTS.max_file_size_mb))),
     skip_protected_content: toBool(obj.skip_protected_content, DEFAULTS.skip_protected_content),
     group_media_messages: toBool(obj.group_media_messages, DEFAULTS.group_media_messages),
+    media_group_buffer_ms: Math.min(
+      10_000,
+      Math.max(200, Math.floor(toNum(obj.media_group_buffer_ms, DEFAULTS.media_group_buffer_ms))),
+    ),
     message_filter_enabled: toBool(obj.message_filter_enabled, DEFAULTS.message_filter_enabled),
     message_filter_keywords: toStr(obj.message_filter_keywords, DEFAULTS.message_filter_keywords),
   };
@@ -375,12 +372,32 @@ export function SettingsManager() {
                   />
                 </div>
               </div>
-              <div className="flex items-end">
+              <div className="flex flex-col justify-end gap-3">
                 <Checkbox
                   label="合并媒体组（相册尽量保持为一组）"
                   checked={settings.group_media_messages}
                   onChange={(checked) => update("group_media_messages", checked)}
                 />
+                <div>
+                  <label className="block text-sm font-medium">相册缓冲时间</label>
+                  <div className="mt-1">
+                    <Select
+                      value={String(settings.media_group_buffer_ms)}
+                      onChange={(value) => update("media_group_buffer_ms", Number.parseInt(value, 10))}
+                      disabled={!settings.group_media_messages}
+                      options={[
+                        { value: "900", label: "0.9 秒（更快，但容易拆分）" },
+                        { value: "1500", label: "1.5 秒（推荐）" },
+                        { value: "2000", label: "2 秒" },
+                        { value: "3000", label: "3 秒（更稳，但更慢）" },
+                        { value: "5000", label: "5 秒（最稳，但更慢）" },
+                      ]}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-slate-400">
+                    只在“合并媒体组”开启时生效：时间越长越不容易把同一相册拆开，但发送会稍微延后。
+                  </p>
+                </div>
               </div>
             </div>
             <div className="mt-3">

@@ -7,6 +7,7 @@ import { loadEnv } from "@/lib/env";
 import { encrypt } from "@/lib/crypto";
 import { cleanupExpiredSessions, loginSessions } from "@/lib/telegram-login";
 import { requireApiAuth } from "@/lib/api-auth";
+import { getErrorMessage } from "@/lib/utils";
 
 loadEnv();
 
@@ -15,18 +16,6 @@ function getTelegramErrorMessage(error: unknown): string | undefined {
   if (!("errorMessage" in error)) return undefined;
   const maybeErrorMessage = (error as { errorMessage?: unknown }).errorMessage;
   return typeof maybeErrorMessage === "string" ? maybeErrorMessage : undefined;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  const telegramErrorMessage = getTelegramErrorMessage(error);
-  if (telegramErrorMessage) return telegramErrorMessage;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
 }
 
 export async function POST(request: NextRequest) {

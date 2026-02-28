@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
 
 loadEnv();
 
@@ -161,8 +162,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, mode, beforeCounts, afterCounts });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "导入预设失败") }, { status: 500 });
   }
 }
-

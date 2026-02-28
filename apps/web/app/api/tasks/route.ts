@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
-import { db, schema, sqlClient } from "@tg-back/db";
+import { db, schema, sqlClient, TASKS_NOTIFY_CHANNEL } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString, parseEnumValue, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
-
-const TASKS_NOTIFY_CHANNEL = "tg_back_sync_tasks_v1";
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
-function parseEnumValue<T extends readonly string[]>(allowed: T, value: string): T[number] | null {
-  return (allowed as readonly string[]).includes(value) ? (value as T[number]) : null;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -103,8 +88,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "加载任务失败") }, { status: 500 });
   }
 }
 
@@ -189,7 +173,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ id, action });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "更新任务失败") }, { status: 500 });
   }
 }

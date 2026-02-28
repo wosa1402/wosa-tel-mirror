@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
+import { calcProgressPct, formatTime, getErrorMessage } from "@/lib/utils";
 
 type Dashboard = {
   channels: { total: number; active: number; protected: number };
@@ -61,33 +62,10 @@ type Dashboard = {
   };
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string | null | undefined): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
-
 function buildGroupQuery(groupName: string): string {
   const params = new URLSearchParams();
   params.set("groupName", groupName);
   return params.toString();
-}
-
-function calcProgressPct(current: number, total: number | null): number | null {
-  if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return null;
-  if (!Number.isFinite(current) || current <= 0) return 0;
-  return Math.max(0, Math.min(100, (current / total) * 100));
 }
 
 function truncateText(value: string, maxLen: number): string {

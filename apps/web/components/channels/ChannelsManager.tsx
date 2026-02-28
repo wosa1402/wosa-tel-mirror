@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { type LocalQueryPreset } from "@/lib/local-presets";
 import { deleteQueryPreset, loadQueryPresets, saveQueryPreset } from "@/lib/query-presets";
+import { calcProgressPct, formatTime, getErrorMessage } from "@/lib/utils";
 
 type MirrorMode = "forward" | "copy";
 type MirrorTarget = "manual" | "auto";
@@ -104,23 +105,6 @@ type BulkAddProgress = {
   failures: Array<{ identifier: string; error: string }>;
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
-
 function formatRelativeTime(value: string | null): string {
   if (!value) return "-";
   const d = new Date(value);
@@ -168,12 +152,6 @@ function syncStatusBadgeClass(raw: string): string {
   return "ui-badge-muted";
 }
 
-function calcProgressPct(current: number, total: number | null): number | null {
-  if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return null;
-  if (!Number.isFinite(current) || current <= 0) return 0;
-  return Math.max(0, Math.min(100, (current / total) * 100));
-}
-
 function truncateText(value: string, maxLen: number): string {
   const text = value.trim();
   if (!text) return "(空)";
@@ -215,15 +193,9 @@ export function ChannelsManager({
 }) {
   const [channels, setChannels] = useState<ChannelRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [autoRefreshMs, setAutoRefreshMs] = useState(1000);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const noticeTimerRef = useRef<number | null>(null);
-  const refreshRef = useRef<(opts?: { silent?: boolean }) => Promise<void>>(async () => {});
-  const loadingRef = useRef(false);
-  const refreshingRef = useRef(false);
 
   const [sourceChannelIdentifier, setSourceChannelIdentifier] = useState("");
   const [bulkAddMode, setBulkAddMode] = useState(false);
@@ -518,10 +490,32 @@ export function ChannelsManager({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/channels", { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load channels");
-      setChannels(data.channels ?? []);
+      const pageSize = 100;
+      let offset = 0;
+      let first = true;
+
+      while (true) {
+        const params = new URLSearchParams();
+        params.set("limit", String(pageSize));
+        params.set("offset", String(offset));
+
+        const res = await fetch(`/api/channels?${params.toString()}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load channels");
+
+        const pageRows = Array.isArray(data.channels) ? (data.channels as ChannelRow[]) : [];
+        if (first) {
+          setChannels(pageRows);
+          first = false;
+        } else if (pageRows.length) {
+          setChannels((prev) => [...prev, ...pageRows]);
+        }
+
+        const nextOffset = data?.page?.nextOffset;
+        if (typeof nextOffset !== "number") break;
+        if (pageRows.length === 0) break;
+        offset = nextOffset;
+      }
     } catch (e: unknown) {
       setError(getErrorMessage(e));
     } finally {
@@ -532,106 +526,6 @@ export function ChannelsManager({
   useEffect(() => {
     refresh().catch(() => {});
   }, []);
-
-  const refreshSilently = async () => {
-    setRefreshing(true);
-    setError("");
-    try {
-      const res = await fetch("/api/channels", { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load channels");
-      setChannels(data.channels ?? []);
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  refreshRef.current = refreshSilently;
-  loadingRef.current = loading;
-  refreshingRef.current = refreshing;
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const id = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      if (loadingRef.current || refreshingRef.current) return;
-      void refreshRef.current().catch(() => {});
-    }, autoRefreshMs);
-    return () => window.clearInterval(id);
-  }, [autoRefresh, autoRefreshMs]);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-    if (typeof EventSource === "undefined") return;
-
-    const params = new URLSearchParams();
-    params.set("limit", "500");
-    params.set("intervalMs", String(autoRefreshMs));
-    const es = new EventSource(`/api/stream/tasks?${params.toString()}`);
-
-    const onTasks = (event: MessageEvent) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          tasks?: Array<{
-            id: string;
-            sourceChannelId: string;
-            taskType: TaskType;
-            status: TaskStatus;
-            progressCurrent: number;
-            progressTotal: number | null;
-            lastProcessedId: number | null;
-            lastError: string | null;
-            createdAt: string;
-            startedAt: string | null;
-            completedAt: string | null;
-            pausedAt: string | null;
-          }>;
-        };
-        if (!Array.isArray(payload.tasks)) return;
-
-        const byChannel = new Map<string, Partial<Record<TaskType, TaskSummary>>>();
-        for (const t of payload.tasks) {
-          let byType = byChannel.get(t.sourceChannelId);
-          if (!byType) {
-            byType = {};
-            byChannel.set(t.sourceChannelId, byType);
-          }
-          if (byType[t.taskType]) continue;
-          byType[t.taskType] = {
-            id: t.id,
-            status: t.status,
-            progressCurrent: t.progressCurrent,
-            progressTotal: t.progressTotal,
-            lastProcessedId: t.lastProcessedId,
-            lastError: t.lastError,
-            createdAt: t.createdAt,
-            startedAt: t.startedAt,
-            completedAt: t.completedAt,
-            pausedAt: t.pausedAt,
-          };
-        }
-
-        setChannels((prev) =>
-          prev.map((c) => {
-            const patch = byChannel.get(c.id);
-            if (!patch) return c;
-            return { ...c, tasks: { ...c.tasks, ...patch } };
-          }),
-        );
-      } catch {
-        // ignore
-      }
-    };
-
-    es.addEventListener("tasks", onTasks as EventListener);
-
-    return () => {
-      es.removeEventListener("tasks", onTasks as EventListener);
-      es.close();
-    };
-  }, [autoRefresh, autoRefreshMs]);
 
   const setPriorityDraft = (channelId: string, value: string) => {
     setPriorityDrafts((prev) => ({ ...prev, [channelId]: value }));
@@ -1239,37 +1133,19 @@ export function ChannelsManager({
 	              未解析/未就绪：{unresolvedCount}（需要运行 mirror-service 来 resolve 并开始同步）
 	            </p>
 	          </div>
-		          <div className="flex items-center gap-4">
-		            <div className="flex items-center gap-3">
-		              <Checkbox label="实时更新" checked={autoRefresh} onChange={(checked) => setAutoRefresh(checked)} />
-		              <div className="w-28">
-		                <Select
-		                  value={String(autoRefreshMs)}
-		                  onChange={(value) => setAutoRefreshMs(Number.parseInt(value, 10))}
-		                  disabled={!autoRefresh}
-		                  options={[
-		                    { value: "200", label: "0.2秒" },
-		                    { value: "500", label: "0.5秒" },
-		                    { value: "1000", label: "1秒" },
-		                    { value: "2000", label: "2秒" },
-		                    { value: "5000", label: "5秒" },
-		                    { value: "10000", label: "10秒" },
-		                  ]}
-		                />
-		              </div>
-		            </div>
-			            <button
-			              type="button"
-			              onClick={() => {
-			                setNotice("");
-			                syncUrlToCurrentFilters();
-			                void refresh();
-			              }}
-			              disabled={loading}
-		              className="ui-btn ui-btn-secondary h-10"
-		            >
-		              {loading ? "刷新中..." : refreshing ? "更新中..." : "刷新"}
-		            </button>
+			          <div className="flex items-center gap-4">
+				            <button
+				              type="button"
+				              onClick={() => {
+				                setNotice("");
+				                syncUrlToCurrentFilters();
+				                void refresh();
+				              }}
+				              disabled={loading}
+			              className="ui-btn ui-btn-secondary h-10"
+			            >
+			              {loading ? "刷新中..." : "刷新"}
+			            </button>
 		            <button
 		              type="button"
 		              onClick={() => {

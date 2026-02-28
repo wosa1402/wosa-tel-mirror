@@ -8,6 +8,7 @@
 文档：
 - 设计文档：`DESIGN.md`
 - 实现细节：`IMPLEMENTATION.md`
+- 稳定性与运维记录（长期跑更省心）：`STABILITY.md`
 
 > 说明：请只用于备份你有权限访问的频道消息；源频道开启“保护内容/禁止转发”时，Telegram 会限制转发/复制，这不是代码能绕过的。
 
@@ -54,6 +55,8 @@ cp .env.example .env
 - `TELEGRAM_API_ID` / `TELEGRAM_API_HASH`：Telegram API 凭证
 
 可选：
+- `TG_BACK_BOOTSTRAP_ACCESS_PASSWORD`：**推荐公网部署设置**。首次启动如果数据库里还没有 `access_password`，会用这个值（加盐哈希）写入 DB，避免“未设密码时被别人抢先设置导致锁死”。如果你不设置，生产环境会自动生成一个初始访问密码并打印到服务端日志里。
+- `TG_BACK_TRUST_PROXY`：只影响限流是否解析真实客户端 IP（需要你在可信反向代理之后，比如 Nginx/Caddy/Cloudflare）。
 - `DATABASE_URL_LISTEN`：用于 LISTEN/NOTIFY（更好的实时推送）。如果使用 Supabase pooler（6543 端口），建议提供一个直连（5432 端口）的连接串。
 - `MIRROR_LOG_FILE`：把 mirror-service 的日志同时写入文件（默认只输出到 stdout）。例如 `./logs/mirror-service.log`。
 

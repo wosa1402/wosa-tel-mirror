@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
 
 loadEnv();
 
@@ -59,78 +60,114 @@ export async function GET(request: NextRequest) {
 
     const countExpr = sql<number>`count(*)`.mapWith(Number);
 
-    const [channelsRow] = await db
-      .select({
-        total: countExpr,
-        active: sql<number>`count(*) filter (where ${schema.sourceChannels.isActive})`.mapWith(Number),
-        protected: sql<number>`count(*) filter (where ${schema.sourceChannels.isProtected})`.mapWith(Number),
-      })
-      .from(schema.sourceChannels)
-      .limit(1);
+    const [
+      channelsRows,
+      messagesRows,
+      tasksRows,
+      runningTaskRows,
+      errorChannelRows,
+      groupChannelRows,
+      groupTaskRows,
+      heartbeatRows,
+    ] = await Promise.all([
+      db
+        .select({
+          total: countExpr,
+          active: sql<number>`count(*) filter (where ${schema.sourceChannels.isActive})`.mapWith(Number),
+          protected: sql<number>`count(*) filter (where ${schema.sourceChannels.isProtected})`.mapWith(Number),
+        })
+        .from(schema.sourceChannels)
+        .limit(1),
+      db
+        .select({
+          total: countExpr,
+          pending: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"pending"})`.mapWith(Number),
+          success: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"success"})`.mapWith(Number),
+          failed: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"failed"})`.mapWith(Number),
+          skipped: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"skipped"})`.mapWith(Number),
+        })
+        .from(schema.messageMappings)
+        .limit(1),
+      db
+        .select({
+          total: countExpr,
+          pending: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"pending"})`.mapWith(Number),
+          running: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"running"})`.mapWith(Number),
+          paused: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"paused"})`.mapWith(Number),
+          completed: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"completed"})`.mapWith(Number),
+          failed: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"failed"})`.mapWith(Number),
+        })
+        .from(schema.syncTasks)
+        .limit(1),
+      db
+        .select({
+          id: schema.syncTasks.id,
+          sourceChannelId: schema.syncTasks.sourceChannelId,
+          taskType: schema.syncTasks.taskType,
+          status: schema.syncTasks.status,
+          progressCurrent: schema.syncTasks.progressCurrent,
+          progressTotal: schema.syncTasks.progressTotal,
+          lastProcessedId: schema.syncTasks.lastProcessedId,
+          lastError: schema.syncTasks.lastError,
+          createdAt: schema.syncTasks.createdAt,
+          startedAt: schema.syncTasks.startedAt,
+          sourceName: schema.sourceChannels.name,
+          sourceChannelIdentifier: schema.sourceChannels.channelIdentifier,
+          sourceGroupName: schema.sourceChannels.groupName,
+          sourceIsActive: schema.sourceChannels.isActive,
+          sourceSyncStatus: schema.sourceChannels.syncStatus,
+        })
+        .from(schema.syncTasks)
+        .innerJoin(schema.sourceChannels, eq(schema.sourceChannels.id, schema.syncTasks.sourceChannelId))
+        .where(eq(schema.syncTasks.status, "running"))
+        .orderBy(desc(schema.syncTasks.startedAt), desc(schema.syncTasks.createdAt))
+        .limit(10),
+      db
+        .select({
+          id: schema.sourceChannels.id,
+          name: schema.sourceChannels.name,
+          channelIdentifier: schema.sourceChannels.channelIdentifier,
+          groupName: schema.sourceChannels.groupName,
+          syncStatus: schema.sourceChannels.syncStatus,
+          isActive: schema.sourceChannels.isActive,
+          isProtected: schema.sourceChannels.isProtected,
+          lastSyncAt: schema.sourceChannels.lastSyncAt,
+          subscribedAt: schema.sourceChannels.subscribedAt,
+        })
+        .from(schema.sourceChannels)
+        .where(eq(schema.sourceChannels.syncStatus, "error"))
+        .orderBy(desc(schema.sourceChannels.lastSyncAt), desc(schema.sourceChannels.subscribedAt))
+        .limit(10),
+      db
+        .select({
+          groupName: schema.sourceChannels.groupName,
+          total: countExpr,
+          active: sql<number>`count(*) filter (where ${schema.sourceChannels.isActive})`.mapWith(Number),
+          protected: sql<number>`count(*) filter (where ${schema.sourceChannels.isProtected})`.mapWith(Number),
+        })
+        .from(schema.sourceChannels)
+        .groupBy(schema.sourceChannels.groupName)
+        .orderBy(schema.sourceChannels.groupName),
+      db
+        .select({
+          groupName: schema.sourceChannels.groupName,
+          status: schema.syncTasks.status,
+          count: countExpr,
+        })
+        .from(schema.syncTasks)
+        .innerJoin(schema.sourceChannels, eq(schema.sourceChannels.id, schema.syncTasks.sourceChannelId))
+        .groupBy(schema.sourceChannels.groupName, schema.syncTasks.status),
+      db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "mirror_service_heartbeat"))
+        .limit(1),
+    ]);
 
-    const [messagesRow] = await db
-      .select({
-        total: countExpr,
-        pending: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"pending"})`.mapWith(Number),
-        success: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"success"})`.mapWith(Number),
-        failed: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"failed"})`.mapWith(Number),
-        skipped: sql<number>`count(*) filter (where ${schema.messageMappings.status} = ${"skipped"})`.mapWith(Number),
-      })
-      .from(schema.messageMappings)
-      .limit(1);
-
-    const [tasksRow] = await db
-      .select({
-        total: countExpr,
-        pending: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"pending"})`.mapWith(Number),
-        running: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"running"})`.mapWith(Number),
-        paused: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"paused"})`.mapWith(Number),
-        completed: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"completed"})`.mapWith(Number),
-        failed: sql<number>`count(*) filter (where ${schema.syncTasks.status} = ${"failed"})`.mapWith(Number),
-      })
-      .from(schema.syncTasks)
-      .limit(1);
-
-    const runningTaskRows = await db
-      .select({
-        id: schema.syncTasks.id,
-        sourceChannelId: schema.syncTasks.sourceChannelId,
-        taskType: schema.syncTasks.taskType,
-        status: schema.syncTasks.status,
-        progressCurrent: schema.syncTasks.progressCurrent,
-        progressTotal: schema.syncTasks.progressTotal,
-        lastProcessedId: schema.syncTasks.lastProcessedId,
-        lastError: schema.syncTasks.lastError,
-        createdAt: schema.syncTasks.createdAt,
-        startedAt: schema.syncTasks.startedAt,
-        sourceName: schema.sourceChannels.name,
-        sourceChannelIdentifier: schema.sourceChannels.channelIdentifier,
-        sourceGroupName: schema.sourceChannels.groupName,
-        sourceIsActive: schema.sourceChannels.isActive,
-        sourceSyncStatus: schema.sourceChannels.syncStatus,
-      })
-      .from(schema.syncTasks)
-      .innerJoin(schema.sourceChannels, eq(schema.sourceChannels.id, schema.syncTasks.sourceChannelId))
-      .where(eq(schema.syncTasks.status, "running"))
-      .orderBy(desc(schema.syncTasks.startedAt), desc(schema.syncTasks.createdAt))
-      .limit(10);
-
-    const errorChannelRows = await db
-      .select({
-        id: schema.sourceChannels.id,
-        name: schema.sourceChannels.name,
-        channelIdentifier: schema.sourceChannels.channelIdentifier,
-        groupName: schema.sourceChannels.groupName,
-        syncStatus: schema.sourceChannels.syncStatus,
-        isActive: schema.sourceChannels.isActive,
-        isProtected: schema.sourceChannels.isProtected,
-        lastSyncAt: schema.sourceChannels.lastSyncAt,
-        subscribedAt: schema.sourceChannels.subscribedAt,
-      })
-      .from(schema.sourceChannels)
-      .where(eq(schema.sourceChannels.syncStatus, "error"))
-      .orderBy(desc(schema.sourceChannels.lastSyncAt), desc(schema.sourceChannels.subscribedAt))
-      .limit(10);
+    const channelsRow = channelsRows[0];
+    const messagesRow = messagesRows[0];
+    const tasksRow = tasksRows[0];
+    const heartbeatRow = heartbeatRows[0];
 
     const errorChannelIds = errorChannelRows.map((c) => c.id);
     const latestErrorEventRows = errorChannelIds.length
@@ -161,27 +198,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const groupChannelRows = await db
-      .select({
-        groupName: schema.sourceChannels.groupName,
-        total: countExpr,
-        active: sql<number>`count(*) filter (where ${schema.sourceChannels.isActive})`.mapWith(Number),
-        protected: sql<number>`count(*) filter (where ${schema.sourceChannels.isProtected})`.mapWith(Number),
-      })
-      .from(schema.sourceChannels)
-      .groupBy(schema.sourceChannels.groupName)
-      .orderBy(schema.sourceChannels.groupName);
-
-    const groupTaskRows = await db
-      .select({
-        groupName: schema.sourceChannels.groupName,
-        status: schema.syncTasks.status,
-        count: countExpr,
-      })
-      .from(schema.syncTasks)
-      .innerJoin(schema.sourceChannels, eq(schema.sourceChannels.id, schema.syncTasks.sourceChannelId))
-      .groupBy(schema.sourceChannels.groupName, schema.syncTasks.status);
-
     const tasksByGroup = new Map<
       string,
       { total: number; pending: number; running: number; paused: number; completed: number; failed: number }
@@ -197,12 +213,6 @@ export async function GET(request: NextRequest) {
       if (row.status === "failed") current.failed += row.count;
       tasksByGroup.set(key, current);
     }
-
-    const [heartbeatRow] = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "mirror_service_heartbeat"))
-      .limit(1);
 
     const heartbeat = parseMirrorServiceHeartbeat(heartbeatRow?.value);
     const now = Date.now();
@@ -294,7 +304,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toPublicErrorMessage(error, "加载仪表盘失败");
     const cause = getErrorCauseMessage(error);
     return NextResponse.json(
       { error: message, cause: process.env.NODE_ENV === "production" ? undefined : cause },

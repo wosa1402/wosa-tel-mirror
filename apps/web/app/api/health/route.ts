@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toPublicErrorMessage } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function GET() {
     return NextResponse.json(
       {
         status: "unhealthy",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: toPublicErrorMessage(error, "Unknown error"),
       },
       { status: 500 }
     );

@@ -3,6 +3,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString, parseIntSafe, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
 
@@ -18,25 +20,6 @@ function getErrorCauseMessage(error: unknown): string | null {
   } catch {
     return String(cause);
   }
-}
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
-function toStringOrNull(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
-  if (typeof value === "string") return value;
-  return String(value);
 }
 
 function buildTelegramMessageLink(
@@ -148,7 +131,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toPublicErrorMessage(error, "加载媒体组失败");
     const cause = getErrorCauseMessage(error);
     return NextResponse.json(
       { error: message, cause: process.env.NODE_ENV === "production" ? undefined : cause },
@@ -156,4 +139,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

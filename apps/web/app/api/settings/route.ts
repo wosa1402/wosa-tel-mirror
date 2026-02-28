@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@tg-back/db";
+import { db, parseSettingValue, type AppSettingKey, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
-import { requireApiAuth, setAccessCookie } from "@/lib/api-auth";
+import { hashAccessPassword, requireApiAuth, setAccessCookie } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getTrimmedString, isMirrorMode, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
 
-type MirrorMode = (typeof schema.mirrorModeEnum.enumValues)[number];
-
-type SettingsKey = keyof typeof schema.defaultSettings;
+type SettingsKey = AppSettingKey;
 
 const editableKeys = Object.keys(schema.defaultSettings).filter((k) => k !== "telegram_session") as SettingsKey[];
-
-function getTrimmedString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
-}
 
 function toBooleanOrNull(value: unknown): boolean | null {
   if (typeof value === "boolean") return value;
@@ -37,24 +33,11 @@ function toNumberOrNull(value: unknown): number | null {
   return null;
 }
 
-function toStringOrNull(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
-  if (typeof value === "boolean") return value ? "true" : "false";
-  return String(value);
-}
-
-function isMirrorMode(value: unknown): value is MirrorMode {
-  return value === "forward" || value === "copy";
-}
-
 function buildMergedSettings(rows: Array<{ key: string; value: unknown }>) {
   const map = new Map(rows.map((r) => [r.key, r.value]));
 
   const merged: Partial<Record<SettingsKey, unknown>> = {};
   for (const key of editableKeys) {
-    const defaultValue = schema.defaultSettings[key];
     const raw = map.get(key as string);
 
     if (key === "access_password") {
@@ -62,31 +45,11 @@ function buildMergedSettings(rows: Array<{ key: string; value: unknown }>) {
       continue;
     }
 
-    if (raw == null) {
-      merged[key] = defaultValue;
-      continue;
-    }
-
-    if (typeof defaultValue === "boolean") {
-      merged[key] = toBooleanOrNull(raw) ?? defaultValue;
-      continue;
-    }
-
-    if (typeof defaultValue === "number") {
-      merged[key] = toNumberOrNull(raw) ?? defaultValue;
-      continue;
-    }
-
-    merged[key] = toStringOrNull(raw) ?? defaultValue;
+    merged[key] = parseSettingValue(key, raw);
   }
 
-  const telegramRaw = map.get("telegram_session");
-  const telegramSessionValue = typeof telegramRaw === "string" ? telegramRaw : telegramRaw == null ? "" : String(telegramRaw);
-  const telegramSessionSet = telegramSessionValue.trim().length > 0;
-
-  const accessRaw = map.get("access_password");
-  const accessPasswordValue = typeof accessRaw === "string" ? accessRaw : accessRaw == null ? "" : String(accessRaw);
-  const accessPasswordSet = accessPasswordValue.trim().length > 0;
+  const telegramSessionSet = parseSettingValue("telegram_session", map.get("telegram_session")).trim().length > 0;
+  const accessPasswordSet = parseSettingValue("access_password", map.get("access_password")).trim().length > 0;
 
   return { merged: merged as Record<SettingsKey, unknown>, telegramSessionSet, accessPasswordSet };
 }
@@ -105,8 +68,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "读取设置失败") }, { status: 500 });
   }
 }
 
@@ -114,6 +76,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const authError = await requireApiAuth(request);
     if (authError) return authError;
+
+    const ip = getClientIp(request);
+    const limiter = checkRateLimit(`settings:patch:${ip}`, { windowMs: 5 * 60 * 1000, max: 30 });
+    if (!limiter.allowed) {
+      const res = NextResponse.json({ error: "Too many requests, please try again later" }, { status: 429 });
+      res.headers.set("Retry-After", String(limiter.retryAfterSec));
+      return res;
+    }
 
     const body = await request.json().catch(() => ({}));
     const updates = (body?.updates ?? body?.values ?? null) as unknown;
@@ -139,7 +109,10 @@ export async function PATCH(request: NextRequest) {
       const defaultValue = schema.defaultSettings[key as SettingsKey];
       let valueToStore: unknown = rawValue;
 
-      if (key === "default_mirror_mode") {
+      if (key === "access_password") {
+        const nextPlain = getTrimmedString(toStringOrNull(rawValue));
+        valueToStore = nextPlain ? await hashAccessPassword(nextPlain) : "";
+      } else if (key === "default_mirror_mode") {
         if (!isMirrorMode(rawValue)) {
           return NextResponse.json({ error: "default_mirror_mode must be forward|copy" }, { status: 400 });
         }
@@ -189,7 +162,6 @@ export async function PATCH(request: NextRequest) {
     return res;
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "保存设置失败") }, { status: 500 });
   }
 }

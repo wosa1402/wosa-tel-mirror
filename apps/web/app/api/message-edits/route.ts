@@ -3,19 +3,10 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
 
 function getErrorCauseMessage(error: unknown): string | null {
   if (!error || typeof error !== "object") return null;
@@ -76,7 +67,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toPublicErrorMessage(error, "加载编辑记录失败");
     const cause = getErrorCauseMessage(error);
     return NextResponse.json(
       { error: message, cause: process.env.NODE_ENV === "production" ? undefined : cause },

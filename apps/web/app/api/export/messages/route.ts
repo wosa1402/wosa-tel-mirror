@@ -1,15 +1,12 @@
 import { NextRequest } from "next/server";
-import { and, desc, eq, gt, gte, ilike, lte, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lte, lt, or, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { ilikeContains } from "@/lib/sql-like";
+import { getTrimmedString, parseEnumValue, parseIntSafe, splitKeywords, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
 
 function parseBoolSafe(value: string): boolean | null {
   const v = value.trim().toLowerCase();
@@ -19,24 +16,10 @@ function parseBoolSafe(value: string): boolean | null {
   return null;
 }
 
-function parseIntSafe(value: string): number | null {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
 function parseDateSafe(value: string): Date | null {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
-}
-
-function toStringOrNull(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
-  if (typeof value === "string") return value;
-  return String(value);
 }
 
 function buildTelegramMessageLink(
@@ -49,30 +32,6 @@ function buildTelegramMessageLink(
   const telegramId = channel.telegramId;
   if (typeof telegramId === "bigint") return `https://t.me/c/${telegramId.toString()}/${messageId}`;
   return null;
-}
-
-function parseEnumValue<T extends readonly string[]>(allowed: T, value: string): T[number] | null {
-  return (allowed as readonly string[]).includes(value) ? (value as T[number]) : null;
-}
-
-function splitKeywords(raw: string, max = 5): string[] {
-  const parts = raw
-    .split(/\s+/g)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (!parts.length) return [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const p of parts) {
-    const keyword = p.slice(0, 50);
-    const key = keyword.toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(keyword);
-    if (out.length >= max) break;
-  }
-  return out;
 }
 
 type ExportRow = {
@@ -234,7 +193,7 @@ export async function GET(request: NextRequest) {
     eq(schema.messageMappings.sourceChannelId, sourceChannelId),
     status ? eq(schema.messageMappings.status, status) : undefined,
     messageType ? eq(schema.messageMappings.messageType, messageType) : undefined,
-    ...keywords.map((k) => ilike(schema.messageMappings.text, `%${k}%`)),
+    ...keywords.map((k) => ilikeContains(schema.messageMappings.text, k)),
     startDate ? gte(schema.messageMappings.sentAt, startDate) : undefined,
     endDate ? lte(schema.messageMappings.sentAt, endDate) : undefined,
     hasMedia != null ? eq(schema.messageMappings.hasMedia, hasMedia) : undefined,

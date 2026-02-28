@@ -3,21 +3,9 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { getTrimmedString, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function getTrimmedString(value: string | null): string {
-  if (!value) return "";
-  return value.trim();
-}
-
-function toStringOrNull(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
-  if (typeof value === "string") return value;
-  return String(value);
-}
 
 function formatDateForFilename(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -131,4 +119,3 @@ export async function GET(request: NextRequest) {
     },
   });
 }
-

@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@tg-back/crypto": "workspace:*",
     "@tg-back/db": "workspace:*",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.4",

@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Copy, FileText, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
+import { formatTime, getErrorMessage } from "@/lib/utils";
 
 type LogsResponse =
   | {
@@ -22,16 +23,6 @@ type LogsResponse =
       lines: string[];
     };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
 function formatBytes(bytes: number | null | undefined): string {
   if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return "-";
   if (bytes < 1024) return `${bytes} B`;
@@ -41,13 +32,6 @@ function formatBytes(bytes: number | null | undefined): string {
   if (mb < 1024) return `${mb.toFixed(1)} MB`;
   const gb = mb / 1024;
   return `${gb.toFixed(2)} GB`;
-}
-
-function formatTime(value: string | null | undefined): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
 }
 
 export function LogsManager() {
@@ -256,4 +240,3 @@ export function LogsManager() {
     </div>
   );
 }
-

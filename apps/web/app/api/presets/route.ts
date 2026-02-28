@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString } from "@/lib/utils";
 
 loadEnv();
 
@@ -31,11 +33,6 @@ type UiPresetsValue = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function getTrimmedString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
 }
 
 function clampName(value: string): string {
@@ -129,8 +126,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "加载预设失败") }, { status: 500 });
   }
 }
 
@@ -164,8 +160,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ scope, preset, presets: nextList });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "保存预设失败") }, { status: 500 });
   }
 }
 
@@ -190,8 +185,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ scope, presets: nextList });
   } catch (error: unknown) {
     console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: toPublicErrorMessage(error, "删除预设失败") }, { status: 500 });
   }
 }
-

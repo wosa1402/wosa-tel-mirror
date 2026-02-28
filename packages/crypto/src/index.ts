@@ -1,7 +1,4 @@
 import crypto from "node:crypto";
-import { loadEnv } from "./env";
-
-loadEnv();
 
 function requireEncryptionSecret(): string {
   const secret = process.env.ENCRYPTION_SECRET?.trim();
@@ -11,6 +8,25 @@ function requireEncryptionSecret(): string {
 
 function deriveKey(secret: string, salt: Buffer): Buffer {
   return crypto.scryptSync(secret, salt, 32);
+}
+
+export function encrypt(plaintext: string): string {
+  const secret = requireEncryptionSecret();
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const key = deriveKey(secret, salt);
+
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    "v1",
+    salt.toString("base64"),
+    iv.toString("base64"),
+    ciphertext.toString("base64"),
+    tag.toString("base64"),
+  ].join(":");
 }
 
 export function decrypt(payload: string): string {

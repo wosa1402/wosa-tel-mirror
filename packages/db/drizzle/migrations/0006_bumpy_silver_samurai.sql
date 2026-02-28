@@ -1,0 +1,1 @@
+ALTER TABLE "source_channels" ALTER COLUMN "mirror_mode" SET DEFAULT 'forward';

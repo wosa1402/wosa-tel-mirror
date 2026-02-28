@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db, schema, sqlClient } from "@tg-back/db";
+import { db, parseSettingValue, schema, sqlClient, TASKS_NOTIFY_CHANNEL } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { getTrimmedString, isMirrorMode, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-const TASKS_NOTIFY_CHANNEL = "tg_back_sync_tasks_v1";
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
 
 function isMissingColumnError(error: unknown, columnName: string): boolean {
   const anyError = error as { cause?: unknown } | null;
@@ -27,19 +17,40 @@ function isMissingColumnError(error: unknown, columnName: string): boolean {
   return cause.message.includes(columnName) && cause.message.toLowerCase().includes("does not exist");
 }
 
-function getTrimmedString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
+function toMigrationErrorResponse(error: unknown): NextResponse | null {
+  if (isMissingColumnError(error, "source_channels.group_name")) {
+    return NextResponse.json(
+      {
+        error: "数据库还没执行最新迁移（缺少 group_name 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
+      },
+      { status: 500 },
+    );
+  }
+
+  if (
+    isMissingColumnError(error, "source_channels.message_filter_mode") ||
+    isMissingColumnError(error, "source_channels.message_filter_keywords")
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "数据库还没执行最新迁移（缺少 message_filter_mode/message_filter_keywords 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
+      },
+      { status: 500 },
+    );
+  }
+
+  return null;
+}
+
+function toChannelRouteErrorResponse(error: unknown, fallback: string): NextResponse {
+  return toMigrationErrorResponse(error) ?? NextResponse.json({ error: toPublicErrorMessage(error, fallback) }, { status: 500 });
 }
 
 function normalizeGroupName(value: unknown): string | undefined {
   if (value == null) return undefined;
   if (typeof value !== "string") return undefined;
   return value.trim().slice(0, 50);
-}
-
-function isMirrorMode(value: unknown): value is "forward" | "copy" {
-  return value === "forward" || value === "copy";
 }
 
 function isMessageFilterMode(value: unknown): value is (typeof schema.messageFilterModeEnum.enumValues)[number] {
@@ -50,14 +61,6 @@ type MirrorTarget = "manual" | "auto";
 
 function toMirrorTarget(value: unknown): MirrorTarget {
   return value === "auto" ? "auto" : "manual";
-}
-
-function toStringOrNull(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
-  if (typeof value === "string") return value;
-  return String(value);
 }
 
 function getBooleanOrUndefined(value: unknown): boolean | undefined {
@@ -76,6 +79,22 @@ function getIntOrUndefined(value: unknown): number | undefined {
   return undefined;
 }
 
+function parsePositiveIntOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeIntOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed >= 0 ? parsed : null;
+}
+
 function clampPriority(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(-100, Math.min(100, Math.trunc(value)));
@@ -88,8 +107,7 @@ async function getDefaultMirrorMode(): Promise<"forward" | "copy"> {
       .from(schema.settings)
       .where(eq(schema.settings.key, "default_mirror_mode"))
       .limit(1);
-    const raw = row?.value;
-    return raw === "copy" ? "copy" : "forward";
+    return parseSettingValue("default_mirror_mode", row?.value);
   } catch {
     return "forward";
   }
@@ -112,7 +130,7 @@ async function ensureTasks(sourceChannelId: string): Promise<void> {
   if (!realtime) values.push({ sourceChannelId, taskType: "realtime" });
 
   if (values.length) {
-    await db.insert(schema.syncTasks).values(values);
+    await db.insert(schema.syncTasks).values(values).onConflictDoNothing();
   }
 
   if (resolve?.status === "failed" || resolve?.status === "paused") {
@@ -155,6 +173,8 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const id = getTrimmedString(url.searchParams.get("id"));
     const mode = getTrimmedString(url.searchParams.get("mode"));
+    const limitRaw = getTrimmedString(url.searchParams.get("limit"));
+    const offsetRaw = getTrimmedString(url.searchParams.get("offset"));
 
     if (mode === "options") {
       const rows = id
@@ -196,24 +216,27 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const limitParsed = limitRaw ? parsePositiveIntOrNull(limitRaw) : null;
+    const limit = limitParsed != null ? Math.min(Math.max(limitParsed, 1), 200) : null;
+    const offsetParsed = offsetRaw ? parseNonNegativeIntOrNull(offsetRaw) : null;
+    const offset = offsetParsed != null ? Math.max(0, offsetParsed) : 0;
+
+    const baseQuery = db
+      .select({
+        source: schema.sourceChannels,
+        mirror: schema.mirrorChannels,
+      })
+      .from(schema.sourceChannels)
+      .leftJoin(schema.mirrorChannels, eq(schema.mirrorChannels.sourceChannelId, schema.sourceChannels.id));
+
     const rows = id
-      ? await db
-          .select({
-            source: schema.sourceChannels,
-            mirror: schema.mirrorChannels,
-          })
-          .from(schema.sourceChannels)
-          .leftJoin(schema.mirrorChannels, eq(schema.mirrorChannels.sourceChannelId, schema.sourceChannels.id))
+      ? await baseQuery
           .where(eq(schema.sourceChannels.id, id))
           .orderBy(desc(schema.sourceChannels.subscribedAt))
-      : await db
-          .select({
-            source: schema.sourceChannels,
-            mirror: schema.mirrorChannels,
-          })
-          .from(schema.sourceChannels)
-          .leftJoin(schema.mirrorChannels, eq(schema.mirrorChannels.sourceChannelId, schema.sourceChannels.id))
-          .orderBy(desc(schema.sourceChannels.subscribedAt));
+          .limit(1)
+      : limit != null
+        ? await baseQuery.orderBy(desc(schema.sourceChannels.subscribedAt)).limit(limit).offset(offset)
+        : await baseQuery.orderBy(desc(schema.sourceChannels.subscribedAt));
 
     const sourceChannelIds = rows.map((r) => r.source.id);
     const tasks = sourceChannelIds.length
@@ -369,6 +392,15 @@ export async function GET(request: NextRequest) {
     lastErrorEventBySource.set(e.sourceChannelId, { id: e.id, level: e.level, message: e.message, createdAt: e.createdAt });
   }
 
+    const page =
+      !id && limit != null
+        ? {
+            limit,
+            offset,
+            nextOffset: rows.length === limit ? offset + limit : null,
+          }
+        : undefined;
+
     return NextResponse.json({
       channels: rows.map((r) => ({
         id: r.source.id,
@@ -416,26 +448,10 @@ export async function GET(request: NextRequest) {
             }
           : null,
       })),
+      page,
     });
   } catch (e: unknown) {
-    if (isMissingColumnError(e, "source_channels.group_name")) {
-      return NextResponse.json(
-        {
-          error: "数据库还没执行最新迁移（缺少 group_name 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    if (isMissingColumnError(e, "source_channels.message_filter_mode") || isMissingColumnError(e, "source_channels.message_filter_keywords")) {
-      return NextResponse.json(
-        {
-          error:
-            "数据库还没执行最新迁移（缺少 message_filter_mode/message_filter_keywords 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ error: `Failed to load channels: ${getErrorMessage(e)}` }, { status: 500 });
+    return toChannelRouteErrorResponse(e, "加载频道失败");
   }
 }
 
@@ -542,24 +558,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: source.id, alreadyExists: false });
   } catch (e: unknown) {
-    if (isMissingColumnError(e, "source_channels.group_name")) {
-      return NextResponse.json(
-        {
-          error: "数据库还没执行最新迁移（缺少 group_name 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    if (isMissingColumnError(e, "source_channels.message_filter_mode") || isMissingColumnError(e, "source_channels.message_filter_keywords")) {
-      return NextResponse.json(
-        {
-          error:
-            "数据库还没执行最新迁移（缺少 message_filter_mode/message_filter_keywords 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ error: `Failed to create channel: ${getErrorMessage(e)}` }, { status: 500 });
+    return toChannelRouteErrorResponse(e, "创建频道失败");
   }
 }
 
@@ -662,24 +661,7 @@ export async function PATCH(request: NextRequest) {
       syncStatus: (updates.syncStatus as string | undefined) ?? existing.syncStatus,
     });
   } catch (e: unknown) {
-    if (isMissingColumnError(e, "source_channels.group_name")) {
-      return NextResponse.json(
-        {
-          error: "数据库还没执行最新迁移（缺少 group_name 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    if (isMissingColumnError(e, "source_channels.message_filter_mode") || isMissingColumnError(e, "source_channels.message_filter_keywords")) {
-      return NextResponse.json(
-        {
-          error:
-            "数据库还没执行最新迁移（缺少 message_filter_mode/message_filter_keywords 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ error: `Failed to update channel: ${getErrorMessage(e)}` }, { status: 500 });
+    return toChannelRouteErrorResponse(e, "更新频道失败");
   }
 }
 
@@ -700,23 +682,6 @@ export async function DELETE(request: NextRequest) {
     if (!deleted.length) return NextResponse.json({ error: "channel not found" }, { status: 404 });
     return NextResponse.json({ id });
   } catch (e: unknown) {
-    if (isMissingColumnError(e, "source_channels.group_name")) {
-      return NextResponse.json(
-        {
-          error: "数据库还没执行最新迁移（缺少 group_name 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    if (isMissingColumnError(e, "source_channels.message_filter_mode") || isMissingColumnError(e, "source_channels.message_filter_keywords")) {
-      return NextResponse.json(
-        {
-          error:
-            "数据库还没执行最新迁移（缺少 message_filter_mode/message_filter_keywords 字段）。请在项目根目录运行 pnpm db:migrate，然后重启 pnpm dev:web。",
-        },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ error: `Failed to delete channel: ${getErrorMessage(e)}` }, { status: 500 });
+    return toChannelRouteErrorResponse(e, "删除频道失败");
   }
 }

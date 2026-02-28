@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { Api, TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
-import { db, schema } from "@tg-back/db";
+import { db, parseSettingValue, schema } from "@tg-back/db";
 import { decrypt } from "@/lib/crypto";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
 
 loadEnv();
+
+const TELEGRAM_API_ID = Number(process.env.TELEGRAM_API_ID);
+const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH?.trim() ?? "";
+
+const PROXY_HOST = process.env.PROXY_HOST || process.env.WINDOWS_HOST || "";
+const PROXY_PORT = process.env.PROXY_PORT ? Number.parseInt(process.env.PROXY_PORT, 10) : 10808;
 
 type TelegramChannelOption = {
   title: string;
@@ -51,10 +57,7 @@ function buildChannelIdentifier(username: unknown, telegramId: string | null): s
 }
 
 async function createTelegramClientFromDbSession(): Promise<TelegramClient> {
-  const apiId = Number(process.env.TELEGRAM_API_ID);
-  const apiHash = process.env.TELEGRAM_API_HASH?.trim() ?? "";
-
-  if (!apiId || !apiHash) {
+  if (!TELEGRAM_API_ID || !TELEGRAM_API_HASH) {
     throw new Error("TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in environment variables");
   }
 
@@ -64,25 +67,22 @@ async function createTelegramClientFromDbSession(): Promise<TelegramClient> {
     .where(eq(schema.settings.key, "telegram_session"))
     .limit(1);
 
-  const raw = row?.value;
-  const encryptedSession = typeof raw === "string" ? raw : raw == null ? "" : String(raw);
+  const encryptedSession = parseSettingValue("telegram_session", row?.value);
   const sessionString = decrypt(encryptedSession);
   if (!sessionString.trim()) {
     throw new Error("Telegram session 未配置，请先在首页完成 Telegram 登录");
   }
 
-  const proxyHost = process.env.PROXY_HOST || process.env.WINDOWS_HOST;
-  const proxyPort = process.env.PROXY_PORT ? Number.parseInt(process.env.PROXY_PORT, 10) : 10808;
   const clientOptions: ConstructorParameters<typeof TelegramClient>[3] = { connectionRetries: 3 };
-  if (proxyHost) {
+  if (PROXY_HOST) {
     clientOptions.proxy = {
       socksType: 5,
-      ip: proxyHost,
-      port: Number.isFinite(proxyPort) ? proxyPort : 10808,
+      ip: PROXY_HOST,
+      port: Number.isFinite(PROXY_PORT) ? PROXY_PORT : 10808,
     } as unknown as ConstructorParameters<typeof TelegramClient>[3]["proxy"];
   }
 
-  return new TelegramClient(new StringSession(sessionString), apiId, apiHash, clientOptions);
+  return new TelegramClient(new StringSession(sessionString), TELEGRAM_API_ID, TELEGRAM_API_HASH, clientOptions);
 }
 
 export async function GET(request: NextRequest) {

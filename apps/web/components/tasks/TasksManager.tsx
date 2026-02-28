@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { type LocalQueryPreset } from "@/lib/local-presets";
 import { deleteQueryPreset, loadQueryPresets, saveQueryPreset } from "@/lib/query-presets";
+import { calcProgressPct, formatTime, getErrorMessage } from "@/lib/utils";
 
 type TaskStatus = "pending" | "running" | "paused" | "completed" | "failed";
 type TaskType = "resolve" | "history_full" | "history_partial" | "realtime" | "retry_failed";
@@ -43,32 +44,9 @@ type TaskRow = {
   };
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("zh-CN");
-}
-
 function formatProgress(current: number, total: number | null): string {
   if (typeof total === "number" && Number.isFinite(total)) return `${current}/${total}`;
   return String(current);
-}
-
-function calcProgressPct(current: number, total: number | null): number | null {
-  if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return null;
-  if (!Number.isFinite(current) || current <= 0) return 0;
-  return Math.max(0, Math.min(100, (current / total) * 100));
 }
 
 function labelTaskStatus(status: TaskStatus): string {
@@ -209,17 +187,11 @@ export function TasksManager({
   const [savedPresets, setSavedPresets] = useState<LocalQueryPreset[]>([]);
 
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [autoRefreshMs, setAutoRefreshMs] = useState(1000);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const noticeTimerRef = useRef<number | null>(null);
-  const refreshRef = useRef<() => Promise<void>>(async () => {});
-  const loadingRef = useRef(false);
-  const refreshingRef = useRef(false);
 
-  const canRefresh = useMemo(() => !loading && !refreshing, [loading, refreshing]);
+  const canRefresh = useMemo(() => !loading, [loading]);
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -369,21 +341,6 @@ export function TasksManager({
     }
   };
 
-  const refreshSilently = async (overrides?: Parameters<typeof buildQuery>[0]): Promise<void> => {
-    setRefreshing(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/tasks?${buildQuery(overrides)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load tasks");
-      setTasks((data.tasks ?? []) as TaskRow[]);
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const applyPreset = (overrides: NonNullable<Parameters<typeof buildShareQuery>[0]> = {}) => {
     setNotice("");
     syncUrlToCurrentQuery(overrides);
@@ -452,49 +409,11 @@ export function TasksManager({
     });
   };
 
-  refreshRef.current = refreshSilently;
-  loadingRef.current = loading;
-  refreshingRef.current = refreshing;
-
   useEffect(() => {
     loadChannels().catch(() => {});
     refresh().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    if (typeof EventSource === "undefined") {
-      const id = window.setInterval(() => {
-        if (typeof document !== "undefined" && document.hidden) return;
-        if (loadingRef.current || refreshingRef.current) return;
-        void refreshRef.current().catch(() => {});
-      }, autoRefreshMs);
-      return () => window.clearInterval(id);
-    }
-
-    const params = new URLSearchParams(buildQuery());
-    params.set("intervalMs", String(autoRefreshMs));
-    const es = new EventSource(`/api/stream/tasks?${params.toString()}`);
-
-    const onTasks = (event: MessageEvent) => {
-      try {
-        const payload = JSON.parse(event.data) as { tasks?: TaskRow[] };
-        if (Array.isArray(payload.tasks)) setTasks(payload.tasks);
-      } catch {
-        // ignore
-      }
-    };
-
-    es.addEventListener("tasks", onTasks as EventListener);
-
-    return () => {
-      es.removeEventListener("tasks", onTasks as EventListener);
-      es.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, autoRefreshMs, groupFilter, selectedChannelId, status, taskType, limit]);
 
   const updateTask = async (task: TaskRow, action: "requeue" | "restart" | "pause" | "resume") => {
     setLoading(true);
@@ -815,9 +734,9 @@ export function TasksManager({
 	                }}
 	                disabled={!canRefresh}
 	                className="inline-flex h-10 items-center justify-center rounded-md bg-black px-4 text-sm text-white hover:bg-black/90 disabled:opacity-50"
-	              >
-	                {loading ? "加载中..." : refreshing ? "更新中..." : "刷新"}
-	              </button>
+		              >
+		                {loading ? "加载中..." : "刷新"}
+		              </button>
 	              <button
 	                type="button"
 	                onClick={() => {
@@ -834,29 +753,11 @@ export function TasksManager({
 	                onClick={retryFailedMessages}
 	                disabled={retryFailedDisabled}
                 className="inline-flex h-10 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm text-gray-900 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-white/10"
-              >
-                重试 failed（创建任务）
-              </button>
-              <div className="flex items-center gap-3">
-                <Checkbox label="实时更新" checked={autoRefresh} onChange={(checked) => setAutoRefresh(checked)} />
-                <div className="w-28">
-                  <Select
-                    value={String(autoRefreshMs)}
-                    onChange={(value) => setAutoRefreshMs(Number.parseInt(value, 10))}
-                    disabled={!autoRefresh}
-                    options={[
-                      { value: "200", label: "0.2秒" },
-                      { value: "500", label: "0.5秒" },
-                      { value: "1000", label: "1秒" },
-                      { value: "2000", label: "2秒" },
-                      { value: "5000", label: "5秒" },
-                      { value: "10000", label: "10秒" },
-                    ]}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+	              >
+	                重试 failed（创建任务）
+	              </button>
+	            </div>
+	          </div>
 
           <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
             <div className="inline-flex items-center gap-3">
@@ -910,7 +811,7 @@ export function TasksManager({
 	            disabled={!canRefresh}
 	            className="ui-btn ui-btn-secondary h-10"
 	          >
-	            {loading ? "刷新中..." : refreshing ? "更新中..." : "刷新"}
+	            {loading ? "刷新中..." : "刷新"}
 	          </button>
 	        </div>
 
