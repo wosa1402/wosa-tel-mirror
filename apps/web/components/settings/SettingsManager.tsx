@@ -362,14 +362,14 @@ export function SettingsManager() {
               <div>
                 <label className="block text-sm font-medium">默认镜像方式（新频道默认）</label>
                 <div className="mt-1">
-                  <Select
-                    value={settings.default_mirror_mode}
-                    onChange={(value) => update("default_mirror_mode", value as MirrorMode)}
-                    options={[
-                      { value: "forward", label: "forward（无署名转发，支持媒体/相册）" },
-                      { value: "copy", label: "copy（仅文本，用于测试）" },
-                    ]}
-                  />
+	                  <Select
+	                    value={settings.default_mirror_mode}
+	                    onChange={(value) => update("default_mirror_mode", value as MirrorMode)}
+	                    options={[
+	                      { value: "forward", label: "forward（无署名转发，支持媒体/相册）" },
+	                      { value: "copy", label: "copy（仅文本，当前用于测试）" },
+	                    ]}
+	                  />
                 </div>
               </div>
               <div className="flex flex-col justify-end gap-3">

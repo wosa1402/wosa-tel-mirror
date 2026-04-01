@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toInternalServerErrorResponse } from "@/lib/api-response";
 import { getTrimmedString } from "@/lib/utils";
 
 loadEnv();
@@ -65,35 +66,39 @@ function formatDateForFilename(date: Date): string {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
+  try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
 
-  const [row] = await db
-    .select({ value: schema.settings.value })
-    .from(schema.settings)
-    .where(eq(schema.settings.key, SETTINGS_KEY))
-    .limit(1);
+    const [row] = await db
+      .select({ value: schema.settings.value })
+      .from(schema.settings)
+      .where(eq(schema.settings.key, SETTINGS_KEY))
+      .limit(1);
 
-  const now = new Date();
-  const stamp = formatDateForFilename(now);
+    const now = new Date();
+    const stamp = formatDateForFilename(now);
 
-  const presetsByScope = normalizePresetsByScope(row?.value);
+    const presetsByScope = normalizePresetsByScope(row?.value);
 
-  const body = JSON.stringify(
-    {
-      type: SETTINGS_KEY,
-      exportedAt: now.toISOString(),
-      presetsByScope,
-    },
-    null,
-    2,
-  );
+    const body = JSON.stringify(
+      {
+        type: SETTINGS_KEY,
+        exportedAt: now.toISOString(),
+        presetsByScope,
+      },
+      null,
+      2,
+    );
 
-  return new Response(body, {
-    status: 200,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "content-disposition": `attachment; filename=\"tg-back-presets-${stamp}.json\"`,
-    },
-  });
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": `attachment; filename=\"tg-back-presets-${stamp}.json\"`,
+      },
+    });
+  } catch (error: unknown) {
+    return toInternalServerErrorResponse(error, "导出预设失败");
+  }
 }

@@ -996,16 +996,19 @@ export function ChannelsManager({
           <div>
             <label className="block text-sm font-medium">镜像方式</label>
             <div className="mt-1 max-w-md">
-              <Select
-                value={mirrorMode}
-                onChange={(next) => setMirrorMode(next as MirrorMode)}
-                options={[
-                  { value: "forward", label: "forward（无署名复制，支持媒体/相册）" },
-                  { value: "copy", label: "copy（仅文本，当前用于测试）" },
-                ]}
-              />
-            </div>
-          </div>
+	              <Select
+	                value={mirrorMode}
+	                onChange={(next) => setMirrorMode(next as MirrorMode)}
+	                options={[
+	                  { value: "forward", label: "forward（无署名复制，支持媒体/相册）" },
+	                  { value: "copy", label: "copy（仅文本，当前用于测试）" },
+	                ]}
+	              />
+	            </div>
+		            <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
+		              提示：copy 当前只复制文本，不复制图片、视频和文件；如需完整媒体请选 forward。
+		            </div>
+	          </div>
           <div className="pt-2">
             <button
               type="button"

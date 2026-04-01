@@ -166,10 +166,10 @@ async function ensureTasks(sourceChannelId: string): Promise<void> {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
   try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
+
     const url = new URL(request.url);
     const id = getTrimmedString(url.searchParams.get("id"));
     const mode = getTrimmedString(url.searchParams.get("mode"));
@@ -456,10 +456,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
   try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
+
     const body = await request.json().catch(() => ({}));
     const groupName = normalizeGroupName((body as { groupName?: unknown }).groupName);
     const sourceChannelIdentifier = getTrimmedString(body.sourceChannelIdentifier);
@@ -563,10 +563,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
   try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
+
     const body = await request.json().catch(() => ({}));
     const id = getTrimmedString(body.id);
     const isActive = getBooleanOrUndefined(body.isActive);
@@ -666,10 +666,10 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
   try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
+
     const body = await request.json().catch(() => ({}));
     const id = getTrimmedString(body.id);
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });

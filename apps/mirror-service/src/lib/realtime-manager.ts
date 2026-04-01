@@ -119,6 +119,7 @@ export function createRealtimeManager(client: TelegramClient, options: RealtimeM
 type RealtimeSubscription = {
   sourceChannelId: string;
   mirrorChannelId: string;
+  cleanup: () => void;
 };
 
 class RealtimeManager {
@@ -272,11 +273,29 @@ class RealtimeManager {
     return this.subscriptions.has(sourceChannelId);
   }
 
+  private cleanupSubscription(sourceChannelId: string): void {
+    const subscription = this.subscriptions.get(sourceChannelId);
+    if (!subscription) return;
+
+    try {
+      subscription.cleanup();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`failed to cleanup realtime subscription: ${sourceChannelId} - ${msg}`);
+    }
+  }
+
   async ensure(): Promise<void> {
     const tasks = await db
       .select({ id: schema.syncTasks.id, sourceChannelId: schema.syncTasks.sourceChannelId, status: schema.syncTasks.status })
       .from(schema.syncTasks)
       .where(and(eq(schema.syncTasks.taskType, "realtime"), inArray(schema.syncTasks.status, ["pending", "running"])));
+
+    const activeSourceChannelIds = new Set(tasks.map((task) => task.sourceChannelId));
+    for (const sourceChannelId of [...this.subscriptions.keys()]) {
+      if (activeSourceChannelIds.has(sourceChannelId)) continue;
+      this.cleanupSubscription(sourceChannelId);
+    }
 
     for (const task of tasks) {
       if (this.has(task.sourceChannelId)) continue;
@@ -337,7 +356,10 @@ class RealtimeManager {
     const mirrorEntity = (await resolvePeer(this.client, mirror.channelIdentifier)).entity;
     const mode = source.mirrorMode ?? "forward";
 
-    const mirrorBehavior = await getMirrorBehaviorSettings();
+    let mirrorBehavior = await getMirrorBehaviorSettings();
+    const refreshMirrorBehavior = async (): Promise<void> => {
+      mirrorBehavior = await getMirrorBehaviorSettings();
+    };
 
     const syncCommentsEnabled = process.env.MIRROR_SYNC_COMMENTS?.trim() !== "false";
     const maxCommentsPerPostRaw = Number.parseInt(process.env.MIRROR_MAX_COMMENTS_PER_POST ?? "500", 10);
@@ -411,13 +433,50 @@ class RealtimeManager {
         timeout: NodeJS.Timeout | null;
       }
     >();
+    const managedHandlers: Array<{ callback: (event: any) => void | Promise<void>; event: NewMessage }> = [];
     let reportedProtectedContent = false;
+    let disposed = false;
+
+    const addManagedEventHandler = (callback: (event: any) => void | Promise<void>, event: NewMessage): void => {
+      this.client.addEventHandler(callback, event);
+      managedHandlers.push({ callback, event });
+    };
+
+    const cleanupCurrentSubscription = (): void => {
+      if (disposed) return;
+      disposed = true;
+
+      for (const entry of mediaGroupBuffers.values()) {
+        if (entry.timeout) clearTimeout(entry.timeout);
+      }
+      mediaGroupBuffers.clear();
+
+      for (const entry of discussionMediaGroupBuffers.values()) {
+        if (entry.timeout) clearTimeout(entry.timeout);
+      }
+      discussionMediaGroupBuffers.clear();
+
+      mirroredDiscussionMessageIds.clear();
+
+      for (const handler of managedHandlers) {
+        this.client.removeEventHandler(handler.callback, handler.event);
+      }
+      managedHandlers.length = 0;
+
+      this.subscriptions.delete(sourceChannelId);
+
+      const telegramKey = source.telegramId ? source.telegramId.toString() : "";
+      if (telegramKey && this.subscribedTelegramIds.get(telegramKey) === source.id) {
+        this.subscribedTelegramIds.delete(telegramKey);
+      }
+    };
 
     let lastActiveCheckAt = 0;
     let cachedIsActive = true;
     let pausedLogged = false;
 
     const ensureActive = async (): Promise<boolean> => {
+      if (disposed) return false;
       const now = Date.now();
       if (now - lastActiveCheckAt < 5_000) return cachedIsActive;
       lastActiveCheckAt = now;
@@ -448,18 +507,18 @@ class RealtimeManager {
         const pausedByUser = status === "paused" && (taskRow?.lastError ?? "") === "paused by user";
         taskActive = status === "pending" || status === "running" || pausedByUser;
 
-          if (channelActive && (status === "pending" || pausedByUser)) {
-            try {
-              await db
-                .update(schema.syncTasks)
-                .set({ status: "running", startedAt: new Date(), pausedAt: null, lastError: null })
-                .where(eq(schema.syncTasks.id, taskId));
-              void notifyTasksChanged({ taskId, sourceChannelId: source.id, taskType: "realtime", status: "running" });
-            } catch (error: unknown) {
-              const msg = error instanceof Error ? error.message : String(error);
-              warnOnce("realtime:mark-running", `realtime failed to mark task running (taskId=${taskId}): ${msg}`);
-            }
+        if (channelActive && (status === "pending" || pausedByUser)) {
+          try {
+            await db
+              .update(schema.syncTasks)
+              .set({ status: "running", startedAt: new Date(), pausedAt: null, lastError: null })
+              .where(eq(schema.syncTasks.id, taskId));
+            void notifyTasksChanged({ taskId, sourceChannelId: source.id, taskType: "realtime", status: "running" });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            warnOnce("realtime:mark-running", `realtime failed to mark task running (taskId=${taskId}): ${msg}`);
           }
+        }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         console.warn(`failed to check realtime task status: ${msg}`);
@@ -490,7 +549,9 @@ class RealtimeManager {
     };
 
     const flushMediaGroup = async (groupId: string): Promise<void> => {
+      if (disposed) return;
       if (!(await ensureActive())) return;
+      await refreshMirrorBehavior();
       const entry = mediaGroupBuffers.get(groupId);
       if (!entry) return;
       mediaGroupBuffers.delete(groupId);
@@ -594,6 +655,9 @@ class RealtimeManager {
             }
           }
 
+          if (skipReason === "protected_content") {
+            await refreshMirrorBehavior();
+          }
           if (skipReason === "protected_content" && !mirrorBehavior.skipProtectedContent) {
             const msg0 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
             await updateMessageMappingsByIds(
@@ -602,6 +666,7 @@ class RealtimeManager {
               "realtime album protected_content blocked",
             );
             await pauseTask(taskId, msg0);
+            cleanupCurrentSubscription();
             return;
           }
 
@@ -616,44 +681,45 @@ class RealtimeManager {
         const waitSeconds = parseFloodWaitSeconds(error);
         if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           await sleep(waitSeconds * 1000);
-	          try {
-	            const forwarded = await forwardMessagesAsCopy(this.client, {
-	              fromPeer: sourceEntity,
-	              toPeer: mirrorEntity,
-	              messageIds,
-	            });
-	            await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
+          await refreshMirrorBehavior();
+          try {
+            const forwarded = await forwardMessagesAsCopy(this.client, {
+              fromPeer: sourceEntity,
+              toPeer: mirrorEntity,
+              messageIds,
+            });
+            await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
 
-	            for (let i = 0; i < items.length; i += 1) {
-	              const mirrorMessageId = forwarded[i]?.id ?? null;
-	              if (mirrorMessageId == null) {
+            for (let i = 0; i < items.length; i += 1) {
+              const mirrorMessageId = forwarded[i]?.id ?? null;
+              if (mirrorMessageId == null) {
                 await db
                   .update(schema.messageMappings)
                   .set({ status: "failed", errorMessage: "missing forwarded message mapping", mirroredAt: new Date() })
                   .where(eq(schema.messageMappings.id, items[i]!.mappingId));
-	              } else {
-	                await db
-	                  .update(schema.messageMappings)
-	                  .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
-	                  .where(eq(schema.messageMappings.id, items[i]!.mappingId));
-	              }
-	            }
+              } else {
+                await db
+                  .update(schema.messageMappings)
+                  .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
+                  .where(eq(schema.messageMappings.id, items[i]!.mappingId));
+              }
+            }
 
-	            for (let i = 0; i < items.length; i += 1) {
-	              const mirrorMessageId = forwarded[i]?.id ?? null;
-	              if (!mirrorMessageId) continue;
-	              await ensureMirrorMessageSpoiler(this.client, {
-	                mirrorPeer: mirrorEntity,
-	                mirrorMessageId,
-	                sourceMessage: items[i]!.message,
-	                mirroredMessage: forwarded[i] ?? null,
-	              });
-	            }
-	
-	            await db
-	              .update(schema.sourceChannels)
-	              .set({ lastSyncAt: new Date(), lastMessageId: messageIds[messageIds.length - 1] })
-	              .where(eq(schema.sourceChannels.id, source.id));
+            for (let i = 0; i < items.length; i += 1) {
+              const mirrorMessageId = forwarded[i]?.id ?? null;
+              if (!mirrorMessageId) continue;
+              await ensureMirrorMessageSpoiler(this.client, {
+                mirrorPeer: mirrorEntity,
+                mirrorMessageId,
+                sourceMessage: items[i]!.message,
+                mirroredMessage: forwarded[i] ?? null,
+              });
+            }
+
+            await db
+              .update(schema.sourceChannels)
+              .set({ lastSyncAt: new Date(), lastMessageId: messageIds[messageIds.length - 1] })
+              .where(eq(schema.sourceChannels.id, source.id));
 
             if (canPostOriginalLinkComment) {
               const anchor = items[0]?.message;
@@ -682,6 +748,7 @@ class RealtimeManager {
         if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
           const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
           await pauseTask(taskId, msg1);
+          cleanupCurrentSubscription();
           return;
         }
 
@@ -695,6 +762,7 @@ class RealtimeManager {
     };
 
     const bufferMediaGroup = (groupId: string, message: Api.Message, mappingId: string): void => {
+      if (disposed) return;
       const existing = mediaGroupBuffers.get(groupId);
       if (existing) {
         existing.items.push({ message, mappingId });
@@ -718,6 +786,7 @@ class RealtimeManager {
         await commentEventBuilder.resolve(this.client);
 
         const flushDiscussionMediaGroup = async (key: string): Promise<void> => {
+          if (disposed) return;
           if (!(await ensureActive())) return;
           const entry = discussionMediaGroupBuffers.get(key);
           if (!entry) return;
@@ -824,6 +893,7 @@ class RealtimeManager {
           message: Api.Message,
           { mirrorPostId, sourcePostId }: { mirrorPostId: number; sourcePostId: number },
         ): void => {
+          if (disposed) return;
           const key = `${sourcePostId}:${groupKey}`;
           const existing = discussionMediaGroupBuffers.get(key);
           if (existing) {
@@ -841,74 +911,73 @@ class RealtimeManager {
           discussionMediaGroupBuffers.set(key, { items: [message], mirrorPostId, sourcePostId, timeout });
         };
 
-        this.client.addEventHandler(
-          async (event) => {
-            try {
-              if (!(await ensureActive())) return;
-              const message = event.message;
-              if (!(message instanceof Api.Message)) return;
-              if (!message.id) return;
-              if (mirroredDiscussionMessageIds.has(message.id)) return;
-              if (mirroredDiscussionMessageIds.size > 5000) mirroredDiscussionMessageIds.clear();
-              mirroredDiscussionMessageIds.add(message.id);
+        const commentHandler = async (event: { message?: unknown }) => {
+          try {
+            if (disposed) return;
+            if (!(await ensureActive())) return;
+            await refreshMirrorBehavior();
+            const message = event.message;
+            if (!(message instanceof Api.Message)) return;
+            if (!message.id) return;
+            if (mirroredDiscussionMessageIds.has(message.id)) return;
+            if (mirroredDiscussionMessageIds.size > 5000) mirroredDiscussionMessageIds.clear();
+            mirroredDiscussionMessageIds.add(message.id);
 
-              if (message.fwdFrom && message.fwdFrom.channelPost) return;
+            if (message.fwdFrom && message.fwdFrom.channelPost) return;
 
-	              const discussion = await this.client.invoke(
-	                new Api.messages.GetDiscussionMessage({ peer: discussionEntity as EntityLike, msgId: message.id }),
-	              );
+            const discussion = await this.client.invoke(
+              new Api.messages.GetDiscussionMessage({ peer: discussionEntity as EntityLike, msgId: message.id }),
+            );
 
-	              const sourceChannelIdStr = source.telegramId ? String(source.telegramId) : "";
-	              const discussionMessages = readArrayProp(discussion, "messages") ?? [];
-	              const related = discussionMessages.find((m) => {
-	                if (!(m instanceof Api.Message)) return false;
-	                if (!(m.peerId instanceof Api.PeerChannel)) return false;
-	                return m.peerId.channelId?.toString?.() === sourceChannelIdStr;
-	              }) as Api.Message | undefined;
-              if (!related?.id) return;
+            const sourceChannelIdStr = source.telegramId ? String(source.telegramId) : "";
+            const discussionMessages = readArrayProp(discussion, "messages") ?? [];
+            const related = discussionMessages.find((m) => {
+              if (!(m instanceof Api.Message)) return false;
+              if (!(m.peerId instanceof Api.PeerChannel)) return false;
+              return m.peerId.channelId?.toString?.() === sourceChannelIdStr;
+            }) as Api.Message | undefined;
+            if (!related?.id) return;
 
-              const sourcePostId = related.id;
-              const [postMapping] = await db
-                .select({ mirrorMessageId: schema.messageMappings.mirrorMessageId })
-                .from(schema.messageMappings)
-                .where(
-                  and(eq(schema.messageMappings.sourceChannelId, source.id), eq(schema.messageMappings.sourceMessageId, sourcePostId)),
-                )
-                .limit(1);
+            const sourcePostId = related.id;
+            const [postMapping] = await db
+              .select({ mirrorMessageId: schema.messageMappings.mirrorMessageId })
+              .from(schema.messageMappings)
+              .where(and(eq(schema.messageMappings.sourceChannelId, source.id), eq(schema.messageMappings.sourceMessageId, sourcePostId)))
+              .limit(1);
 
-              const mirrorPostId = postMapping?.mirrorMessageId;
-              if (!mirrorPostId) return;
+            const mirrorPostId = postMapping?.mirrorMessageId;
+            if (!mirrorPostId) return;
 
-              const rawText = typeof message.message === "string" ? message.message : "";
-              const link = buildSourceMessageLink(source, sourcePostId);
-              const formattingEntities = Array.isArray(message.entities) ? message.entities : undefined;
+            const rawText = typeof message.message === "string" ? message.message : "";
+            const link = buildSourceMessageLink(source, sourcePostId);
+            const formattingEntities = Array.isArray(message.entities) ? message.entities : undefined;
 
-              const isAlbumItem = !!message.groupedId && !!message.media && !(message.media instanceof Api.MessageMediaWebPage);
-              if (isAlbumItem) {
-                bufferDiscussionMediaGroup(String(message.groupedId), message, { mirrorPostId, sourcePostId });
+            const isAlbumItem = !!message.groupedId && !!message.media && !(message.media instanceof Api.MessageMediaWebPage);
+            if (isAlbumItem) {
+              bufferDiscussionMediaGroup(String(message.groupedId), message, { mirrorPostId, sourcePostId });
+              return;
+            }
+
+            await ensureOriginalLinkComment(this.client, { mirrorEntity, mirrorChannelId: mirror.id, mirrorPostId, sourceLink: link });
+
+            const sendOnce = async () => {
+              if (message.media && !(message.media instanceof Api.MessageMediaWebPage)) {
+                await this.client.sendFile(mirrorEntity as EntityLike, {
+                  file: (getSendFileMediaForMessage(message) ?? message.media) as FileLike,
+                  caption: rawText,
+                  formattingEntities,
+                  commentTo: mirrorPostId,
+                });
                 return;
               }
-
-              await ensureOriginalLinkComment(this.client, { mirrorEntity, mirrorChannelId: mirror.id, mirrorPostId, sourceLink: link });
-
-	              const sendOnce = async () => {
-	                if (message.media && !(message.media instanceof Api.MessageMediaWebPage)) {
-	                  await this.client.sendFile(mirrorEntity as EntityLike, {
-	                    file: (getSendFileMediaForMessage(message) ?? message.media) as FileLike,
-	                    caption: rawText,
-	                    formattingEntities,
-	                    commentTo: mirrorPostId,
-	                  });
-	                  return;
-	                }
-	                if (rawText.trim()) {
-	                  await this.client.sendMessage(mirrorEntity as EntityLike, {
-	                    message: rawText,
-	                    formattingEntities,
-	                    commentTo: mirrorPostId,
-	                  });
-	                }
-	              };
+              if (rawText.trim()) {
+                await this.client.sendMessage(mirrorEntity as EntityLike, {
+                  message: rawText,
+                  formattingEntities,
+                  commentTo: mirrorPostId,
+                });
+              }
+            };
 
             try {
               await sendOnce();
@@ -920,345 +989,365 @@ class RealtimeManager {
               } else {
                 throw error;
               }
-              }
-            } catch (error: unknown) {
-              const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
-              console.error(`realtime comment handler error: ${msg}`);
             }
-          },
-          commentEventBuilder,
-        );
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
+            console.error(`realtime comment handler error: ${msg}`);
+          }
+        };
+
+        addManagedEventHandler(commentHandler, commentEventBuilder);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
         console.warn(`comments sync disabled (failed to subscribe): ${msg}`);
       }
     }
 
-    this.client.addEventHandler(
-      async (event) => {
-        try {
-          if (!(await ensureActive())) return;
-          const message = event.message;
-          if (!(message instanceof Api.Message)) return;
-          if (!message.id) return;
+    const mainHandler = async (event: { message?: unknown }) => {
+      try {
+        if (disposed) return;
+        if (!(await ensureActive())) return;
+        await refreshMirrorBehavior();
+        const message = event.message;
+        if (!(message instanceof Api.Message)) return;
+        if (!message.id) return;
 
-          const sentAt = new Date(message.date * 1000);
-          const text = typeof message.message === "string" ? message.message : "";
-          const textPreview = text.length > 200 ? `${text.slice(0, 200)}` : text;
-          const messageType = messageTypeFromMessage(message);
-          const mediaGroupId = message.groupedId ? String(message.groupedId) : null;
-          const hasMedia = !!message.media;
-          const fileSize = extractMediaFileSize(message);
+        const sentAt = new Date(message.date * 1000);
+        const text = typeof message.message === "string" ? message.message : "";
+        const textPreview = text.length > 200 ? `${text.slice(0, 200)}` : text;
+        const messageType = messageTypeFromMessage(message);
+        const mediaGroupId = message.groupedId ? String(message.groupedId) : null;
+        const hasMedia = !!message.media;
+        const fileSize = extractMediaFileSize(message);
 
-          let initialStatus: (typeof schema.messageStatusEnum.enumValues)[number] = "pending";
-          let initialSkipReason: (typeof schema.skipReasonEnum.enumValues)[number] | null = null;
-          let initialErrorMessage: string | null = null;
-          let initialMirroredAt: Date | null = null;
+        let initialStatus: (typeof schema.messageStatusEnum.enumValues)[number] = "pending";
+        let initialSkipReason: (typeof schema.skipReasonEnum.enumValues)[number] | null = null;
+        let initialErrorMessage: string | null = null;
+        let initialMirroredAt: Date | null = null;
 
-          if (hasMedia) {
-            if (messageType === "video" && !mirrorBehavior.mirrorVideos) {
-              initialStatus = "skipped";
-              initialSkipReason = "unsupported_type";
-              initialErrorMessage = "skipped: video disabled by settings";
-              initialMirroredAt = new Date();
-            } else if (
-              mirrorBehavior.maxFileSizeBytes != null &&
-              fileSize != null &&
-              Number.isFinite(fileSize) &&
-              fileSize > mirrorBehavior.maxFileSizeBytes
-            ) {
-              initialStatus = "skipped";
-              initialSkipReason = "file_too_large";
-              initialErrorMessage = `skipped: file too large (${Math.ceil(fileSize / 1024 / 1024)}MB > ${mirrorBehavior.maxFileSizeMb}MB)`;
-              initialMirroredAt = new Date();
+        if (hasMedia) {
+          if (messageType === "video" && !mirrorBehavior.mirrorVideos) {
+            initialStatus = "skipped";
+            initialSkipReason = "unsupported_type";
+            initialErrorMessage = "skipped: video disabled by settings";
+            initialMirroredAt = new Date();
+          } else if (
+            mirrorBehavior.maxFileSizeBytes != null &&
+            fileSize != null &&
+            Number.isFinite(fileSize) &&
+            fileSize > mirrorBehavior.maxFileSizeBytes
+          ) {
+            initialStatus = "skipped";
+            initialSkipReason = "file_too_large";
+            initialErrorMessage = `skipped: file too large (${Math.ceil(fileSize / 1024 / 1024)}MB > ${mirrorBehavior.maxFileSizeMb}MB)`;
+            initialMirroredAt = new Date();
+          }
+        }
+
+        const inserted = await withDbRetry(
+          () =>
+            db
+              .insert(schema.messageMappings)
+              .values({
+                sourceChannelId: source.id,
+                sourceMessageId: message.id,
+                mirrorChannelId: mirror.id,
+                messageType,
+                mediaGroupId,
+                status: initialStatus,
+                skipReason: initialSkipReason,
+                errorMessage: initialErrorMessage,
+                hasMedia,
+                fileSize: fileSize ?? null,
+                text: text || null,
+                textPreview: textPreview || null,
+                sentAt,
+                mirroredAt: initialMirroredAt,
+              })
+              .onConflictDoNothing()
+              .returning({ id: schema.messageMappings.id }),
+          `realtime upsert message_mapping (taskId=${taskId}, msgId=${message.id})`,
+          { attempts: 3, baseDelayMs: 250 },
+        );
+        if (!inserted.length) return;
+
+        const mappingId = inserted[0]!.id;
+
+        if (initialStatus === "skipped") return;
+
+        if (mode === "forward" && mirrorBehavior.groupMediaMessages && message.groupedId) {
+          bufferMediaGroup(String(message.groupedId), message, mappingId);
+          return;
+        }
+
+        const markSkipped = async (skipReason: (typeof schema.skipReasonEnum.enumValues)[number]) => {
+          if (skipReason === "protected_content" && !reportedProtectedContent) {
+            reportedProtectedContent = true;
+            console.warn(
+              `source channel has protected content enabled; realtime forwarding is blocked. New messages will be marked skipped (or realtime task paused if skip_protected_content=false).`,
+            );
+            await logSyncEvent({
+              sourceChannelId: source.id,
+              level: "warn",
+              message: `protected content enabled; realtime forwarding blocked (taskId=${taskId})`,
+            });
+          }
+          if (skipReason === "protected_content" && !source.isProtected) {
+            try {
+              await withDbRetry(
+                () => db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id)),
+                `realtime mark source protected (taskId=${taskId}, sourceId=${source.id})`,
+                { attempts: 3, baseDelayMs: 250 },
+              );
+              source.isProtected = true;
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
             }
           }
-
-          const inserted = await withDbRetry(
+          await withDbRetry(
             () =>
               db
-                .insert(schema.messageMappings)
-                .values({
-                  sourceChannelId: source.id,
-                  sourceMessageId: message.id,
-                  mirrorChannelId: mirror.id,
-                  messageType,
-                  mediaGroupId,
-                  status: initialStatus,
-                  skipReason: initialSkipReason,
-                  errorMessage: initialErrorMessage,
-                  hasMedia,
-                  fileSize: fileSize ?? null,
-                  text: text || null,
-                  textPreview: textPreview || null,
-                  sentAt,
-                  mirroredAt: initialMirroredAt,
-                })
-                .onConflictDoNothing()
-                .returning({ id: schema.messageMappings.id }),
-            `realtime upsert message_mapping (taskId=${taskId}, msgId=${message.id})`,
+                .update(schema.messageMappings)
+                .set({ status: "skipped", skipReason, mirroredAt: new Date() })
+                .where(eq(schema.messageMappings.id, mappingId)),
+            `realtime mark skipped (taskId=${taskId}, mappingId=${mappingId})`,
             { attempts: 3, baseDelayMs: 250 },
           );
-          if (!inserted.length) return;
+        };
 
-          const mappingId = inserted[0]!.id;
+        const messageFilter = await getEffectiveMessageFilterSettings(source.id);
+        if (shouldSkipMessageByFilter(text, messageFilter)) {
+          await markSkipped("filtered");
+          return;
+        }
 
-          if (initialStatus === "skipped") return;
-
-          if (mode === "forward" && mirrorBehavior.groupMediaMessages && message.groupedId) {
-            bufferMediaGroup(String(message.groupedId), message, mappingId);
-            return;
+        const markProtectedContentBlocked = async (error: unknown): Promise<void> => {
+          if (!reportedProtectedContent) {
+            reportedProtectedContent = true;
+            console.warn(
+              `source channel has protected content enabled; realtime forwarding is blocked. New messages will be marked skipped (or realtime task paused if skip_protected_content=false).`,
+            );
+            await logSyncEvent({
+              sourceChannelId: source.id,
+              level: "warn",
+              message: `protected content enabled; realtime forwarding blocked (taskId=${taskId})`,
+            });
+          }
+          if (!source.isProtected) {
+            try {
+              await withDbRetry(
+                () => db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id)),
+                `realtime mark source protected (taskId=${taskId}, sourceId=${source.id})`,
+                { attempts: 3, baseDelayMs: 250 },
+              );
+              source.isProtected = true;
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
+            }
           }
 
-	          const markSkipped = async (skipReason: (typeof schema.skipReasonEnum.enumValues)[number]) => {
-            if (skipReason === "protected_content" && !reportedProtectedContent) {
-              reportedProtectedContent = true;
-              console.warn(
-                `source channel has protected content enabled; realtime forwarding is blocked. New messages will be marked skipped (or realtime task paused if skip_protected_content=false).`,
-              );
-              await logSyncEvent({
-                sourceChannelId: source.id,
-                level: "warn",
-                message: `protected content enabled; realtime forwarding blocked (taskId=${taskId})`,
-              });
-            }
-            if (skipReason === "protected_content" && !source.isProtected) {
-              try {
-                await withDbRetry(
-                  () => db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id)),
-                  `realtime mark source protected (taskId=${taskId}, sourceId=${source.id})`,
-                  { attempts: 3, baseDelayMs: 250 },
-                );
-                source.isProtected = true;
-              } catch (e: unknown) {
-                const msg = e instanceof Error ? e.message : String(e);
-                console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
-              }
-            }
-            await withDbRetry(
-              () =>
-                db
-                  .update(schema.messageMappings)
-                  .set({ status: "skipped", skipReason, mirroredAt: new Date() })
-                  .where(eq(schema.messageMappings.id, mappingId)),
-              `realtime mark skipped (taskId=${taskId}, mappingId=${mappingId})`,
-              { attempts: 3, baseDelayMs: 250 },
-            );
-	          };
+          const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+          await withDbRetry(
+            () =>
+              db
+                .update(schema.messageMappings)
+                .set({ status: "failed", skipReason: "protected_content", errorMessage: msg, mirroredAt: new Date() })
+                .where(eq(schema.messageMappings.id, mappingId)),
+            `realtime mark protected blocked (taskId=${taskId}, mappingId=${mappingId})`,
+            { attempts: 3, baseDelayMs: 250 },
+          );
 
-          const messageFilter = await getEffectiveMessageFilterSettings(source.id);
-          if (shouldSkipMessageByFilter(text, messageFilter)) {
-            await markSkipped("filtered");
-            return;
+          await pauseTask(taskId, msg);
+          cleanupCurrentSubscription();
+        };
+
+        const markFailed = async (error: unknown) => {
+          const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
+          await withDbRetry(
+            () =>
+              db
+                .update(schema.messageMappings)
+                .set({ status: "failed", errorMessage: msg, mirroredAt: new Date() })
+                .where(eq(schema.messageMappings.id, mappingId)),
+            `realtime mark failed (taskId=${taskId}, mappingId=${mappingId})`,
+            { attempts: 3, baseDelayMs: 250 },
+          );
+        };
+
+        const markSuccess = async (mirrorMessageId: number | null) => {
+          await withDbRetry(
+            () =>
+              db
+                .update(schema.messageMappings)
+                .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
+                .where(eq(schema.messageMappings.id, mappingId)),
+            `realtime mark success (taskId=${taskId}, mappingId=${mappingId})`,
+            { attempts: 3, baseDelayMs: 250 },
+          );
+
+          await withDbRetry(
+            () =>
+              db
+                .update(schema.sourceChannels)
+                .set({ lastSyncAt: new Date(), lastMessageId: message.id })
+                .where(eq(schema.sourceChannels.id, source.id)),
+            `realtime update source lastSyncAt (taskId=${taskId}, sourceId=${source.id})`,
+            { attempts: 3, baseDelayMs: 250 },
+          );
+        };
+
+        let mirroredMessage: Api.Message | null = null;
+
+        const tryMirrorOnce = async (): Promise<number | null> => {
+          if (mode === "copy") {
+            mirroredMessage = null;
+            const content = text.trim();
+            if (!content) throw new Error("unsupported_type: empty text in copy mode");
+            const sent = await this.client.sendMessage(mirrorEntity, { message: content });
+            await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
+            return sent?.id ?? null;
           }
+          const forwarded = await forwardMessagesAsCopy(this.client, {
+            fromPeer: sourceEntity,
+            toPeer: mirrorEntity,
+            messageIds: [message.id],
+          });
+          await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
+          const m = forwarded[0];
+          if (!m?.id) throw new Error("missing forwarded message mapping");
+          mirroredMessage = m;
+          return m.id;
+        };
 
-	          const markProtectedContentBlocked = async (error: unknown): Promise<void> => {
-            if (!reportedProtectedContent) {
-              reportedProtectedContent = true;
-              console.warn(
-                `source channel has protected content enabled; realtime forwarding is blocked. New messages will be marked skipped (or realtime task paused if skip_protected_content=false).`,
-              );
-              await logSyncEvent({
-                sourceChannelId: source.id,
-                level: "warn",
-                message: `protected content enabled; realtime forwarding blocked (taskId=${taskId})`,
-              });
-            }
-            if (!source.isProtected) {
-              try {
-                await withDbRetry(
-                  () => db.update(schema.sourceChannels).set({ isProtected: true }).where(eq(schema.sourceChannels.id, source.id)),
-                  `realtime mark source protected (taskId=${taskId}, sourceId=${source.id})`,
-                  { attempts: 3, baseDelayMs: 250 },
-                );
-                source.isProtected = true;
-              } catch (e: unknown) {
-                const msg = e instanceof Error ? e.message : String(e);
-                console.warn(`failed to mark source channel protected: ${source.id} - ${msg}`);
-              }
-            }
-
-            const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-            await withDbRetry(
-              () =>
-                db
-                  .update(schema.messageMappings)
-                  .set({ status: "failed", skipReason: "protected_content", errorMessage: msg, mirroredAt: new Date() })
-                  .where(eq(schema.messageMappings.id, mappingId)),
-              `realtime mark protected blocked (taskId=${taskId}, mappingId=${mappingId})`,
-              { attempts: 3, baseDelayMs: 250 },
-            );
-
-            await pauseTask(taskId, msg);
-          };
-
-          const markFailed = async (error: unknown) => {
-            const msg = error instanceof Error ? error.message : getTelegramErrorMessage(error) ?? String(error);
-            await withDbRetry(
-              () =>
-                db
-                  .update(schema.messageMappings)
-                  .set({ status: "failed", errorMessage: msg, mirroredAt: new Date() })
-                  .where(eq(schema.messageMappings.id, mappingId)),
-              `realtime mark failed (taskId=${taskId}, mappingId=${mappingId})`,
-              { attempts: 3, baseDelayMs: 250 },
-            );
-          };
-
-	          const markSuccess = async (mirrorMessageId: number | null) => {
-	            await withDbRetry(
-	              () =>
-	                db
-	                  .update(schema.messageMappings)
-	                  .set({ status: "success", mirrorMessageId, mirroredAt: new Date(), errorMessage: null })
-	                  .where(eq(schema.messageMappings.id, mappingId)),
-	              `realtime mark success (taskId=${taskId}, mappingId=${mappingId})`,
-	              { attempts: 3, baseDelayMs: 250 },
-	            );
-
-            await withDbRetry(
-              () =>
-                db
-                  .update(schema.sourceChannels)
-	                .set({ lastSyncAt: new Date(), lastMessageId: message.id })
-	                .where(eq(schema.sourceChannels.id, source.id)),
-              `realtime update source lastSyncAt (taskId=${taskId}, sourceId=${source.id})`,
-              { attempts: 3, baseDelayMs: 250 },
-            );
-	          };
-
-	          let mirroredMessage: Api.Message | null = null;
-
-		          const tryMirrorOnce = async (): Promise<number | null> => {
-		            if (mode === "copy") {
-		              mirroredMessage = null;
-		              const content = text.trim();
-		              if (!content) throw new Error("unsupported_type: empty text in copy mode");
-		              const sent = await this.client.sendMessage(mirrorEntity, { message: content });
-		              await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
-		              return sent?.id ?? null;
-		            }
-		            const forwarded = await forwardMessagesAsCopy(this.client, {
-		              fromPeer: sourceEntity,
-		              toPeer: mirrorEntity,
-		              messageIds: [message.id],
-		            });
-		            await throttleMirrorSend(mirrorBehavior.mirrorIntervalMs);
-		            const m = forwarded[0];
-		            if (!m?.id) throw new Error("missing forwarded message mapping");
-		            mirroredMessage = m;
-		            return m.id;
-		          };
-
-          try {
-            if (mode === "copy") {
-              const content = text.trim();
-              if (!content) {
-                await markSkipped("unsupported_type");
-                return;
-              }
-            }
-	
-	            const mirrorMessageId = await tryMirrorOnce();
-	            await markSuccess(mirrorMessageId);
-
-	            if (mode === "forward" && mirrorMessageId) {
-	              await ensureMirrorMessageSpoiler(this.client, {
-	                mirrorPeer: mirrorEntity,
-	                mirrorMessageId,
-	                sourceMessage: message,
-	                mirroredMessage,
-	              });
-	            }
-	
-	            if (canPostOriginalLinkComment && mirrorMessageId && message.post) {
-	              const link = buildSourceMessageLink(source, message.id);
-	              void ensureOriginalLinkComment(this.client, {
-                mirrorEntity,
-                mirrorChannelId: mirror.id,
-                mirrorPostId: mirrorMessageId,
-                sourceLink: link,
-              });
-            }
-          } catch (error: unknown) {
-            const { skipReason } = classifyMirrorError(error);
-            if (skipReason) {
-              if (skipReason === "protected_content" && !mirrorBehavior.skipProtectedContent) {
-                await markProtectedContentBlocked(error);
-                return;
-              }
-              await markSkipped(skipReason);
+        try {
+          if (mode === "copy") {
+            const content = text.trim();
+            if (!content) {
+              await markSkipped("unsupported_type");
               return;
             }
+          }
 
-            const waitSeconds = parseFloodWaitSeconds(error);
-            if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
-              await sleep(waitSeconds * 1000);
-	              try {
-	                const mirrorMessageId = await tryMirrorOnce();
-	                await markSuccess(mirrorMessageId);
+          const mirrorMessageId = await tryMirrorOnce();
+          await markSuccess(mirrorMessageId);
 
-	                if (mode === "forward" && mirrorMessageId) {
-	                  await ensureMirrorMessageSpoiler(this.client, {
-	                    mirrorPeer: mirrorEntity,
-	                    mirrorMessageId,
-	                    sourceMessage: message,
-	                    mirroredMessage,
-	                  });
-	                }
-	
-	                if (canPostOriginalLinkComment && mirrorMessageId && message.post) {
-	                  const link = buildSourceMessageLink(source, message.id);
-	                  void ensureOriginalLinkComment(this.client, {
-                    mirrorEntity,
-                    mirrorChannelId: mirror.id,
-                    mirrorPostId: mirrorMessageId,
-                    sourceLink: link,
-                  });
-                }
-                return;
-              } catch (error2: unknown) {
-                const { skipReason: skipReason2 } = classifyMirrorError(error2);
-                if (skipReason2) {
-                  if (skipReason2 === "protected_content" && !mirrorBehavior.skipProtectedContent) {
-                    await markProtectedContentBlocked(error2);
-                    return;
-                  }
-                  await markSkipped(skipReason2);
-                  return;
-                }
-                await markFailed(error2);
-                return;
-              }
-            }
+          if (mode === "forward" && mirrorMessageId) {
+            await ensureMirrorMessageSpoiler(this.client, {
+              mirrorPeer: mirrorEntity,
+              mirrorMessageId,
+              sourceMessage: message,
+              mirroredMessage,
+            });
+          }
 
-            if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
-              const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-              await pauseTask(taskId, msg1);
-            }
-            await markFailed(error);
+          if (canPostOriginalLinkComment && mirrorMessageId && message.post) {
+            const link = buildSourceMessageLink(source, message.id);
+            void ensureOriginalLinkComment(this.client, {
+              mirrorEntity,
+              mirrorChannelId: mirror.id,
+              mirrorPostId: mirrorMessageId,
+              sourceLink: link,
+            });
           }
         } catch (error: unknown) {
-          console.error("realtime handler error:", error);
-        }
-      },
-      eventBuilder,
-    );
+          const { skipReason } = classifyMirrorError(error);
+          if (skipReason) {
+            if (skipReason === "protected_content") {
+              await refreshMirrorBehavior();
+            }
+            if (skipReason === "protected_content" && !mirrorBehavior.skipProtectedContent) {
+              await markProtectedContentBlocked(error);
+              return;
+            }
+            await markSkipped(skipReason);
+            return;
+          }
 
-    await withDbRetry(
-      () => db.update(schema.syncTasks).set({ status: "running", startedAt: new Date() }).where(eq(schema.syncTasks.id, taskId)),
-      `realtime mark task running (taskId=${taskId})`,
-      { attempts: 3, baseDelayMs: 250 },
-    );
+          const waitSeconds = parseFloodWaitSeconds(error);
+          if (waitSeconds && waitSeconds <= FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+            await sleep(waitSeconds * 1000);
+            await refreshMirrorBehavior();
+            try {
+              const mirrorMessageId = await tryMirrorOnce();
+              await markSuccess(mirrorMessageId);
+
+              if (mode === "forward" && mirrorMessageId) {
+                await ensureMirrorMessageSpoiler(this.client, {
+                  mirrorPeer: mirrorEntity,
+                  mirrorMessageId,
+                  sourceMessage: message,
+                  mirroredMessage,
+                });
+              }
+
+              if (canPostOriginalLinkComment && mirrorMessageId && message.post) {
+                const link = buildSourceMessageLink(source, message.id);
+                void ensureOriginalLinkComment(this.client, {
+                  mirrorEntity,
+                  mirrorChannelId: mirror.id,
+                  mirrorPostId: mirrorMessageId,
+                  sourceLink: link,
+                });
+              }
+              return;
+            } catch (error2: unknown) {
+              const { skipReason: skipReason2 } = classifyMirrorError(error2);
+              if (skipReason2) {
+                if (skipReason2 === "protected_content") {
+                  await refreshMirrorBehavior();
+                }
+                if (skipReason2 === "protected_content" && !mirrorBehavior.skipProtectedContent) {
+                  await markProtectedContentBlocked(error2);
+                  return;
+                }
+                await markSkipped(skipReason2);
+                return;
+              }
+              await markFailed(error2);
+              return;
+            }
+          }
+
+          if (waitSeconds && waitSeconds > FLOOD_WAIT_AUTO_SLEEP_MAX_SEC) {
+            const msg1 = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
+            await pauseTask(taskId, msg1);
+            cleanupCurrentSubscription();
+          }
+          await markFailed(error);
+        }
+      } catch (error: unknown) {
+        console.error("realtime handler error:", error);
+      }
+    };
+
+    addManagedEventHandler(mainHandler, eventBuilder);
+
+    try {
+      await withDbRetry(
+        () => db.update(schema.syncTasks).set({ status: "running", startedAt: new Date() }).where(eq(schema.syncTasks.id, taskId)),
+        `realtime mark task running (taskId=${taskId})`,
+        { attempts: 3, baseDelayMs: 250 },
+      );
+    } catch (error: unknown) {
+      cleanupCurrentSubscription();
+      throw error;
+    }
     void notifyTasksChanged({ taskId, sourceChannelId: source.id, taskType: "realtime", status: "running" });
 
-    this.subscriptions.set(sourceChannelId, { sourceChannelId, mirrorChannelId: mirror.id });
+    this.subscriptions.set(sourceChannelId, { sourceChannelId, mirrorChannelId: mirror.id, cleanup: cleanupCurrentSubscription });
     console.log(`realtime subscribed: source=${source.channelIdentifier} -> mirror=${mirror.channelIdentifier}`);
-    await logSyncEvent({
-      sourceChannelId: source.id,
-      level: "info",
-      message: `realtime subscribed -> mirror=${mirror.channelIdentifier} (taskId=${taskId})`,
-    });
+    try {
+      await logSyncEvent({
+        sourceChannelId: source.id,
+        level: "info",
+        message: `realtime subscribed -> mirror=${mirror.channelIdentifier} (taskId=${taskId})`,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`failed to log realtime subscribe event: ${msg}`);
+    }
   }
 }
   return new RealtimeManager(client);

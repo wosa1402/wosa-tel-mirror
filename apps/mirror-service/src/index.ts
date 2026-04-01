@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db, schema } from "@tg-back/db";
+import { db, listenSqlClient, schema, sqlClient } from "@tg-back/db";
 import { loadEnv } from "./utils/env";
 import { setupFileLogging } from "./utils/file-logging";
 import { sleep } from "./utils/sleep";
@@ -10,6 +10,7 @@ import { MIRROR_SERVICE_HEARTBEAT_INTERVAL_MS, writeMirrorServiceHeartbeat } fro
 import { createRealtimeManager } from "./lib/realtime-manager";
 import { createRetryFailedTasksScheduler } from "./lib/retry-failed-scheduler";
 import { logSyncEvent } from "./lib/sync-events";
+import { createSyncEventsCleanupScheduler } from "./lib/sync-events-cleanup";
 import { createTaskClaimer } from "./lib/task-claimer";
 import { processHistoryFullTask } from "./lib/task-history-full";
 import { markTaskFailed } from "./lib/task-lifecycle";
@@ -91,6 +92,16 @@ async function loop(): Promise<void> {
       } catch {
         // ignore
       }
+      try {
+        await sqlClient.end({ timeout: 5 });
+      } catch {
+        // ignore
+      }
+      try {
+        await listenSqlClient.end({ timeout: 5 });
+      } catch {
+        // ignore
+      }
       process.exit(0);
     })();
   };
@@ -122,6 +133,8 @@ async function loop(): Promise<void> {
   const retryFailedTasksScheduler = createRetryFailedTasksScheduler();
 
   const floodWaitAutoResumeScheduler = createFloodWaitAutoResumeScheduler({ notifyTasksChanged, logSyncEvent });
+
+  const syncEventsCleanupScheduler = createSyncEventsCleanupScheduler({ logSyncEvent });
 
   const startTask = (task: { id: string; taskType: (typeof schema.taskTypeEnum.enumValues)[number]; sourceChannelId: string }) => {
     runningChannelIds.add(task.sourceChannelId);
@@ -170,6 +183,7 @@ async function loop(): Promise<void> {
       await retryFailedTasksScheduler.ensure(now);
       await floodWaitAutoResumeScheduler.ensure(now);
       await healthScheduler.ensure(now);
+      await syncEventsCleanupScheduler.ensure(now);
 
       const { concurrentMirrors } = await getTaskRunnerSettings();
       if (concurrentMirrors !== lastConcurrencyValue && now - lastConcurrencyLogAt > 3_000) {

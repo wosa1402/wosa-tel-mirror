@@ -3,7 +3,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, listenSqlClient, schema, TASKS_NOTIFY_CHANNEL } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
-import { getErrorMessage, getTrimmedString, parseEnumValue, parseIntSafe } from "@/lib/utils";
+import { toPublicErrorMessage } from "@/lib/api-error";
+import { toInternalServerErrorResponse } from "@/lib/api-response";
+import { getTrimmedString, parseEnumValue, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
 
@@ -80,112 +82,113 @@ async function queryTasks(args: {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
+  try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
 
-  const url = new URL(request.url);
-  const params = url.searchParams;
+    const url = new URL(request.url);
+    const params = url.searchParams;
 
-  const groupName = getTrimmedString(params.get("groupName") ?? params.get("group_name"));
-  const hasGroupParam = params.has("groupName") || params.has("group_name");
-  const sourceChannelId = getTrimmedString(params.get("sourceChannelId"));
-  const statusRaw = getTrimmedString(params.get("status"));
-  const taskTypeRaw = getTrimmedString(params.get("taskType"));
-  const limitRaw = getTrimmedString(params.get("limit"));
-  const intervalMsRaw = getTrimmedString(params.get("intervalMs") ?? params.get("interval_ms"));
+    const groupName = getTrimmedString(params.get("groupName") ?? params.get("group_name"));
+    const hasGroupParam = params.has("groupName") || params.has("group_name");
+    const sourceChannelId = getTrimmedString(params.get("sourceChannelId"));
+    const statusRaw = getTrimmedString(params.get("status"));
+    const taskTypeRaw = getTrimmedString(params.get("taskType"));
+    const limitRaw = getTrimmedString(params.get("limit"));
+    const intervalMsRaw = getTrimmedString(params.get("intervalMs") ?? params.get("interval_ms"));
 
-  const limitParsed = limitRaw ? parseIntSafe(limitRaw) : null;
-  const limit = clampInt(limitParsed ?? 200, 1, 500);
+    const limitParsed = limitRaw ? parseIntSafe(limitRaw) : null;
+    const limit = clampInt(limitParsed ?? 200, 1, 500);
 
-  const intervalMsParsed = intervalMsRaw ? parseIntSafe(intervalMsRaw) : null;
-  const throttleMs = clampInt(intervalMsParsed ?? 1000, 100, 10000);
+    const intervalMsParsed = intervalMsRaw ? parseIntSafe(intervalMsRaw) : null;
+    const throttleMs = clampInt(intervalMsParsed ?? 1000, 100, 10000);
 
-  const status = statusRaw ? parseEnumValue(schema.taskStatusEnum.enumValues, statusRaw) : null;
-  const taskType = taskTypeRaw ? parseEnumValue(schema.taskTypeEnum.enumValues, taskTypeRaw) : null;
+    const status = statusRaw ? parseEnumValue(schema.taskStatusEnum.enumValues, statusRaw) : null;
+    const taskType = taskTypeRaw ? parseEnumValue(schema.taskTypeEnum.enumValues, taskTypeRaw) : null;
 
-  const encoder = new TextEncoder();
+    const encoder = new TextEncoder();
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      let closed = false;
-      let lastSnapshot = "";
-      let lastSendAt = 0;
-      let scheduled = false;
-      let notifyPending = false;
-      let unlisten: (() => Promise<void>) | null = null;
-      let keepAliveTimer: NodeJS.Timeout | null = null;
-      let scheduleTimer: NodeJS.Timeout | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        let closed = false;
+        let lastSnapshot = "";
+        let lastSendAt = 0;
+        let scheduled = false;
+        let notifyPending = false;
+        let unlisten: (() => Promise<void>) | null = null;
+        let keepAliveTimer: NodeJS.Timeout | null = null;
+        let scheduleTimer: NodeJS.Timeout | null = null;
 
-      const safeClose = () => {
-        if (closed) return;
-        closed = true;
-        try {
-          controller.close();
-        } catch {
-          // ignore
-        }
-      };
-
-      const sendRaw = (payload: string) => {
-        if (closed) return;
-        controller.enqueue(encoder.encode(payload));
-      };
-
-      const sendEvent = (event: string, data: unknown) => {
-        sendRaw(`event: ${event}\n`);
-        sendRaw(`data: ${JSON.stringify(data)}\n\n`);
-      };
-
-      const cleanup = async () => {
-        if (keepAliveTimer) {
-          clearInterval(keepAliveTimer);
-          keepAliveTimer = null;
-        }
-        if (scheduleTimer) {
-          clearTimeout(scheduleTimer);
-          scheduleTimer = null;
-        }
-        if (unlisten) {
+        const safeClose = () => {
+          if (closed) return;
+          closed = true;
           try {
-            await unlisten();
+            controller.close();
           } catch {
             // ignore
           }
-          unlisten = null;
-        }
-        safeClose();
-      };
+        };
 
-      let resolveAborted: (() => void) | null = null;
-      const aborted = new Promise<void>((resolve) => {
-        resolveAborted = resolve;
-      });
-      const triggerAborted = () => {
-        if (!resolveAborted) return;
-        resolveAborted();
-        resolveAborted = null;
-      };
-      if (request.signal.aborted) triggerAborted();
+        const sendRaw = (payload: string) => {
+          if (closed) return;
+          controller.enqueue(encoder.encode(payload));
+        };
 
-      const abortHandler = () => {
-        triggerAborted();
-        void cleanup();
-      };
-      request.signal.addEventListener("abort", abortHandler);
+        const sendEvent = (event: string, data: unknown) => {
+          sendRaw(`event: ${event}\n`);
+          sendRaw(`data: ${JSON.stringify(data)}\n\n`);
+        };
 
-      const sendTasksNow = async () => {
-        if (closed) return;
-        try {
-          const tasks = await queryTasks({ sourceChannelId, hasGroupParam, groupName, status, taskType, limit });
-          const snapshot = JSON.stringify(tasks);
-          if (snapshot === lastSnapshot) return;
-          lastSnapshot = snapshot;
-          lastSendAt = Date.now();
-          sendEvent("tasks", { ts: new Date().toISOString(), tasks });
-        } catch (error: unknown) {
-          sendEvent("server_error", { error: getErrorMessage(error) });
-        }
-      };
+        const cleanup = async () => {
+          if (keepAliveTimer) {
+            clearInterval(keepAliveTimer);
+            keepAliveTimer = null;
+          }
+          if (scheduleTimer) {
+            clearTimeout(scheduleTimer);
+            scheduleTimer = null;
+          }
+          if (unlisten) {
+            try {
+              await unlisten();
+            } catch {
+              // ignore
+            }
+            unlisten = null;
+          }
+          safeClose();
+        };
+
+        let resolveAborted: (() => void) | null = null;
+        const aborted = new Promise<void>((resolve) => {
+          resolveAborted = resolve;
+        });
+        const triggerAborted = () => {
+          if (!resolveAborted) return;
+          resolveAborted();
+          resolveAborted = null;
+        };
+        if (request.signal.aborted) triggerAborted();
+
+        const abortHandler = () => {
+          triggerAborted();
+          void cleanup();
+        };
+        request.signal.addEventListener("abort", abortHandler);
+
+        const sendTasksNow = async () => {
+          if (closed) return;
+          try {
+            const tasks = await queryTasks({ sourceChannelId, hasGroupParam, groupName, status, taskType, limit });
+            const snapshot = JSON.stringify(tasks);
+            if (snapshot === lastSnapshot) return;
+            lastSnapshot = snapshot;
+            lastSendAt = Date.now();
+            sendEvent("tasks", { ts: new Date().toISOString(), tasks });
+          } catch (error: unknown) {
+            sendEvent("server_error", { error: toPublicErrorMessage(error, "服务器内部错误") });
+          }
+        };
 
       const scheduleSend = () => {
         if (closed) return;
@@ -236,7 +239,7 @@ export async function GET(request: NextRequest) {
 
           await aborted;
         } catch (error: unknown) {
-          sendEvent("server_error", { error: getErrorMessage(error) });
+          sendEvent("server_error", { error: toPublicErrorMessage(error, "服务器内部错误") });
           await cleanup();
         } finally {
           request.signal.removeEventListener("abort", abortHandler);
@@ -246,12 +249,15 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  } catch (error: unknown) {
+    return toInternalServerErrorResponse(error, "加载任务流失败");
+  }
 }

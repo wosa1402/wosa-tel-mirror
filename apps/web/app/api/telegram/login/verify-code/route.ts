@@ -7,43 +7,34 @@ import { loadEnv } from "@/lib/env";
 import { encrypt } from "@/lib/crypto";
 import { cleanupExpiredSessions, loginSessions } from "@/lib/telegram-login";
 import { requireApiAuth } from "@/lib/api-auth";
-import { getErrorMessage } from "@/lib/utils";
+import { toInternalServerErrorResponse } from "@/lib/api-response";
+import { getTelegramErrorMessage } from "@/lib/telegram-errors";
 
 loadEnv();
 
-function getTelegramErrorMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  if (!("errorMessage" in error)) return undefined;
-  const maybeErrorMessage = (error as { errorMessage?: unknown }).errorMessage;
-  return typeof maybeErrorMessage === "string" ? maybeErrorMessage : undefined;
-}
-
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
-  cleanupExpiredSessions();
-
-  const body = await request.json().catch(() => ({}));
-  const loginId = typeof body.loginId === "string" ? body.loginId.trim() : "";
-  const code = typeof body.code === "string" ? body.code.trim() : "";
-  const password = typeof body.password === "string" ? body.password : undefined;
-
-  if (!loginId || !code) {
-    return NextResponse.json({ error: "loginId and code are required" }, { status: 400 });
-  }
-
-  const session = loginSessions.get(loginId);
-  if (!session) {
-    return NextResponse.json(
-      { error: "Login session expired. Please restart the login process." },
-      { status: 400 },
-    );
-  }
-
-  const { client, phoneCodeHash, phoneNumber } = session;
-
   try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
+
+    cleanupExpiredSessions();
+
+    const body = await request.json().catch(() => ({}));
+    const loginId = typeof body.loginId === "string" ? body.loginId.trim() : "";
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    const password = typeof body.password === "string" ? body.password : undefined;
+
+    if (!loginId || !code) {
+      return NextResponse.json({ error: "loginId and code are required" }, { status: 400 });
+    }
+
+    const session = loginSessions.get(loginId);
+    if (!session) {
+      return NextResponse.json({ error: "Login session expired. Please restart the login process." }, { status: 400 });
+    }
+
+    const { client, phoneCodeHash, phoneNumber } = session;
+
     try {
       await client.invoke(
         new Api.auth.SignIn({
@@ -86,9 +77,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { error: getErrorMessage(error) || "Login failed" },
-      { status: 400 },
-    );
+    const telegramMsg = getTelegramErrorMessage(error);
+    if (telegramMsg) return NextResponse.json({ error: telegramMsg }, { status: 400 });
+    return toInternalServerErrorResponse(error, "Telegram 登录失败");
   }
 }

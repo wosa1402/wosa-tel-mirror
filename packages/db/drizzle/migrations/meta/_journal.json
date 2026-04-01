@@ -64,6 +64,27 @@
       "when": 1772280033117,
       "tag": "0008_huge_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772334517240,
+      "tag": "0009_wakeful_terrax",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772334766571,
+      "tag": "0010_good_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774971519399,
+      "tag": "0011_black_onslaught",
+      "breakpoints": true
     }
   ]
 }

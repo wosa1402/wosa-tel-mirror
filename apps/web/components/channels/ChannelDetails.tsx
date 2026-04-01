@@ -787,19 +787,19 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
 	              <div className="font-medium">镜像方式</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <div className="min-w-[220px]">
-                  <Select
-                    value={mirrorModeDraft}
-                    onChange={(next) => {
-                      setMirrorModeDraft(next as MirrorMode);
-                      setMirrorModeDirty(true);
-                    }}
-                    disabled={loading}
-                    options={[
-                      { value: "forward", label: "forward（转发）" },
-                      { value: "copy", label: "copy（复制，无署名）" },
-                    ]}
-                  />
-                </div>
+	                  <Select
+	                    value={mirrorModeDraft}
+	                    onChange={(next) => {
+	                      setMirrorModeDraft(next as MirrorMode);
+	                      setMirrorModeDirty(true);
+	                    }}
+	                    disabled={loading}
+	                    options={[
+	                      { value: "forward", label: "forward（支持媒体/相册）" },
+	                      { value: "copy", label: "copy（仅文本，当前用于测试）" },
+	                    ]}
+	                  />
+	                </div>
                 <button
                   type="button"
                   onClick={saveMirrorMode}
@@ -809,10 +809,10 @@ export function ChannelDetails({ channelId }: { channelId: string }) {
                   保存镜像方式
                 </button>
               </div>
-	              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
-	                提示：修改后只影响“之后同步”的消息；已经备份到镜像频道里的历史消息不会自动重发/重排。
-	              </div>
-	            </div>
+			              <div className="mt-2 text-xs text-black/60 dark:text-slate-400">
+			                提示：修改后只影响“之后同步”的消息；已经备份到镜像频道里的历史消息不会自动重发或重排。copy 当前只复制文本，不复制图片、视频和文件；如需完整媒体请选 forward。
+			              </div>
+		            </div>
 
             <div className="mt-4 rounded-md border border-black/10 bg-white p-4 text-sm dark:border-white/10 dark:bg-white/5">
               <div className="font-medium">广告过滤（该频道）</div>

@@ -5,35 +5,10 @@ import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
 import { toPublicErrorMessage } from "@/lib/api-error";
 import { ilikeContains } from "@/lib/sql-like";
-import { getTrimmedString, parseEnumValue, parseIntSafe, splitKeywords, toStringOrNull } from "@/lib/utils";
+import { buildTelegramMessageLink } from "@/lib/telegram-links";
+import { getTrimmedString, parseBoolSafe, parseDateSafe, parseEnumValue, parseIntSafe, splitKeywords, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function parseBoolSafe(value: string): boolean | null {
-  const v = value.trim().toLowerCase();
-  if (!v) return null;
-  if (v === "1" || v === "true" || v === "yes" || v === "y") return true;
-  if (v === "0" || v === "false" || v === "no" || v === "n") return false;
-  return null;
-}
-
-function parseDateSafe(value: string): Date | null {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function buildTelegramMessageLink(
-  channel: { username?: string | null; telegramId?: bigint | null },
-  messageId: number | null,
-): string | null {
-  if (!messageId) return null;
-  const username = typeof channel.username === "string" ? channel.username.trim().replace(/^@/, "") : "";
-  if (username) return `https://t.me/${username}/${messageId}`;
-  const telegramId = channel.telegramId;
-  if (typeof telegramId === "bigint") return `https://t.me/c/${telegramId.toString()}/${messageId}`;
-  return null;
-}
 
 export async function GET(request: NextRequest) {
   try {

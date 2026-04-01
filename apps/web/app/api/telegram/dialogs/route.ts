@@ -6,6 +6,8 @@ import { db, parseSettingValue, schema } from "@tg-back/db";
 import { decrypt } from "@/lib/crypto";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toInternalServerErrorResponse } from "@/lib/api-response";
+import { getTelegramErrorMessage } from "@/lib/telegram-errors";
 
 loadEnv();
 
@@ -21,13 +23,6 @@ type TelegramChannelOption = {
   username: string | null;
   telegramId: string | null;
 };
-
-function getTelegramErrorMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  if (!("errorMessage" in error)) return undefined;
-  const maybe = (error as { errorMessage?: unknown }).errorMessage;
-  return typeof maybe === "string" ? maybe : undefined;
-}
 
 function toPositiveIntString(value: unknown): string | null {
   if (value == null) return null;
@@ -86,46 +81,57 @@ async function createTelegramClientFromDbSession(): Promise<TelegramClient> {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
-
-  const url = new URL(request.url);
-  const limitRaw = url.searchParams.get("limit");
-  const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
-  const limit = Number.isFinite(limitParsed) ? Math.min(500, Math.max(1, limitParsed)) : 200;
-
-  let client: TelegramClient | null = null;
   try {
-    client = await createTelegramClientFromDbSession();
-    await client.connect();
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
 
-    const dialogs = await client.getDialogs({ limit });
-    const channels: TelegramChannelOption[] = [];
+    const url = new URL(request.url);
+    const limitRaw = url.searchParams.get("limit");
+    const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
+    const limit = Number.isFinite(limitParsed) ? Math.min(500, Math.max(1, limitParsed)) : 200;
 
-    for (const dialog of dialogs) {
-      const entity = dialog.entity;
-      if (!(entity instanceof Api.Channel)) continue;
-      if (!entity.broadcast) continue;
+    let client: TelegramClient | null = null;
+    try {
+      client = await createTelegramClientFromDbSession();
+      await client.connect();
 
-      const telegramId = toPositiveIntString(entity.id);
-      const identifier = buildChannelIdentifier(entity.username, telegramId);
-      if (!identifier) continue;
+      const dialogs = await client.getDialogs({ limit });
+      const channels: TelegramChannelOption[] = [];
 
-      const title = typeof entity.title === "string" && entity.title.trim() ? entity.title.trim() : identifier;
-      const username =
-        typeof entity.username === "string" && entity.username.trim()
-          ? `@${entity.username.trim().replace(/^@/, "")}`
-          : null;
+      for (const dialog of dialogs) {
+        const entity = dialog.entity;
+        if (!(entity instanceof Api.Channel)) continue;
+        if (!entity.broadcast) continue;
 
-      channels.push({ title, identifier, username, telegramId });
+        const telegramId = toPositiveIntString(entity.id);
+        const identifier = buildChannelIdentifier(entity.username, telegramId);
+        if (!identifier) continue;
+
+        const title = typeof entity.title === "string" && entity.title.trim() ? entity.title.trim() : identifier;
+        const username =
+          typeof entity.username === "string" && entity.username.trim()
+            ? `@${entity.username.trim().replace(/^@/, "")}`
+            : null;
+
+        channels.push({ title, identifier, username, telegramId });
+      }
+
+      channels.sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
+      return NextResponse.json({ channels });
+    } catch (error: unknown) {
+      const telegramMsg = getTelegramErrorMessage(error);
+      if (telegramMsg) return NextResponse.json({ error: telegramMsg }, { status: 400 });
+
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("Telegram session 未配置")) {
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+
+      return toInternalServerErrorResponse(error, "加载 Telegram 对话列表失败");
+    } finally {
+      if (client) client.disconnect().catch(() => {});
     }
-
-    channels.sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
-    return NextResponse.json({ channels });
   } catch (error: unknown) {
-    const msg = getTelegramErrorMessage(error) ?? (error instanceof Error ? error.message : String(error));
-    return NextResponse.json({ error: msg || "Failed to load Telegram dialogs" }, { status: 400 });
-  } finally {
-    if (client) client.disconnect().catch(() => {});
+    return toInternalServerErrorResponse(error, "加载 Telegram 对话列表失败");
   }
 }

@@ -14,6 +14,6 @@ export const syncEvents = pgTable(
   },
   (table) => ({
     channelCreatedIdx: index("event_channel_created_idx").on(table.sourceChannelId, table.createdAt),
+    createdAtIdx: index("event_created_at_idx").on(table.createdAt),
   }),
 );
-

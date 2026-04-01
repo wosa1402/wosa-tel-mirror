@@ -4,7 +4,7 @@ import { loadEnv } from "@/lib/env";
 import { hashAccessPassword, requireApiAuth, setAccessCookie } from "@/lib/api-auth";
 import { toPublicErrorMessage } from "@/lib/api-error";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { getTrimmedString, isMirrorMode, toStringOrNull } from "@/lib/utils";
+import { getTrimmedString, isMirrorMode, toNumberOrNull, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
 
@@ -18,17 +18,6 @@ function toBooleanOrNull(value: unknown): boolean | null {
     const normalized = value.trim().toLowerCase();
     if (normalized === "true") return true;
     if (normalized === "false") return false;
-  }
-  return null;
-}
-
-function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
   }
   return null;
 }

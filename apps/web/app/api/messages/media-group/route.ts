@@ -3,36 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
-import { toPublicErrorMessage } from "@/lib/api-error";
+import { getErrorCauseMessage, toPublicErrorMessage } from "@/lib/api-error";
+import { buildTelegramMessageLink } from "@/lib/telegram-links";
 import { getTrimmedString, parseIntSafe, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function getErrorCauseMessage(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  if (!("cause" in error)) return null;
-  const cause = (error as { cause?: unknown }).cause;
-  if (!cause) return null;
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  try {
-    return JSON.stringify(cause);
-  } catch {
-    return String(cause);
-  }
-}
-
-function buildTelegramMessageLink(
-  channel: { username?: string | null; telegramId?: bigint | null },
-  messageId: number | null,
-): string | null {
-  if (!messageId) return null;
-  const username = typeof channel.username === "string" ? channel.username.trim().replace(/^@/, "") : "";
-  if (username) return `https://t.me/${username}/${messageId}`;
-  const telegramId = channel.telegramId;
-  if (typeof telegramId === "bigint") return `https://t.me/c/${telegramId.toString()}/${messageId}`;
-  return null;
-}
 
 export async function GET(request: NextRequest) {
   try {

@@ -3,36 +3,12 @@ import { and, desc, eq, gt, gte, lte, lt, or, sql, type SQL } from "drizzle-orm"
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
+import { toInternalServerErrorResponse } from "@/lib/api-response";
 import { ilikeContains } from "@/lib/sql-like";
-import { getTrimmedString, parseEnumValue, parseIntSafe, splitKeywords, toStringOrNull } from "@/lib/utils";
+import { buildTelegramMessageLink } from "@/lib/telegram-links";
+import { getTrimmedString, parseBoolSafe, parseDateSafe, parseEnumValue, parseIntSafe, splitKeywords, toStringOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function parseBoolSafe(value: string): boolean | null {
-  const v = value.trim().toLowerCase();
-  if (!v) return null;
-  if (v === "1" || v === "true" || v === "yes" || v === "y") return true;
-  if (v === "0" || v === "false" || v === "no" || v === "n") return false;
-  return null;
-}
-
-function parseDateSafe(value: string): Date | null {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function buildTelegramMessageLink(
-  channel: { username?: string | null; telegramId?: bigint | null },
-  messageId: number | null,
-): string | null {
-  if (!messageId) return null;
-  const username = typeof channel.username === "string" ? channel.username.trim().replace(/^@/, "") : "";
-  if (username) return `https://t.me/${username}/${messageId}`;
-  const telegramId = channel.telegramId;
-  if (typeof telegramId === "bigint") return `https://t.me/c/${telegramId.toString()}/${messageId}`;
-  return null;
-}
 
 type ExportRow = {
   id: string;
@@ -59,57 +35,58 @@ type ExportRow = {
 };
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth(request);
-  if (authError) return authError;
+  try {
+    const authError = await requireApiAuth(request);
+    if (authError) return authError;
 
-  const url = new URL(request.url);
-  const params = url.searchParams;
+    const url = new URL(request.url);
+    const params = url.searchParams;
 
-  const sourceChannelId = getTrimmedString(params.get("sourceChannelId"));
-  if (!sourceChannelId) {
-    return new Response(JSON.stringify({ error: "Missing sourceChannelId" }), {
-      status: 400,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
-  }
+    const sourceChannelId = getTrimmedString(params.get("sourceChannelId"));
+    if (!sourceChannelId) {
+      return new Response(JSON.stringify({ error: "Missing sourceChannelId" }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
 
-  const statusRaw = getTrimmedString(params.get("status"));
-  const messageTypeRaw = getTrimmedString(params.get("messageType"));
-  const q = getTrimmedString(params.get("q"));
-  const keywords = q ? splitKeywords(q) : [];
-  const start = getTrimmedString(params.get("start"));
-  const end = getTrimmedString(params.get("end"));
+    const statusRaw = getTrimmedString(params.get("status"));
+    const messageTypeRaw = getTrimmedString(params.get("messageType"));
+    const q = getTrimmedString(params.get("q"));
+    const keywords = q ? splitKeywords(q) : [];
+    const start = getTrimmedString(params.get("start"));
+    const end = getTrimmedString(params.get("end"));
 
-  const hasMediaRaw = getTrimmedString(params.get("hasMedia") ?? params.get("has_media"));
-  const isDeletedRaw = getTrimmedString(params.get("isDeleted") ?? params.get("is_deleted") ?? params.get("deleted"));
-  const editedRaw = getTrimmedString(params.get("edited"));
-  const skipReasonRaw = getTrimmedString(params.get("skipReason") ?? params.get("skip_reason"));
-  const minFileSizeMbRaw = getTrimmedString(params.get("minFileSizeMb") ?? params.get("min_file_size_mb"));
-  const maxFileSizeMbRaw = getTrimmedString(params.get("maxFileSizeMb") ?? params.get("max_file_size_mb"));
+    const hasMediaRaw = getTrimmedString(params.get("hasMedia") ?? params.get("has_media"));
+    const isDeletedRaw = getTrimmedString(params.get("isDeleted") ?? params.get("is_deleted") ?? params.get("deleted"));
+    const editedRaw = getTrimmedString(params.get("edited"));
+    const skipReasonRaw = getTrimmedString(params.get("skipReason") ?? params.get("skip_reason"));
+    const minFileSizeMbRaw = getTrimmedString(params.get("minFileSizeMb") ?? params.get("min_file_size_mb"));
+    const maxFileSizeMbRaw = getTrimmedString(params.get("maxFileSizeMb") ?? params.get("max_file_size_mb"));
 
-  const groupMediaRaw = getTrimmedString(params.get("groupMedia") ?? params.get("group_media"));
-  const groupMedia = groupMediaRaw ? groupMediaRaw.toLowerCase() !== "false" : true;
+    const groupMediaRaw = getTrimmedString(params.get("groupMedia") ?? params.get("group_media"));
+    const groupMedia = groupMediaRaw ? groupMediaRaw.toLowerCase() !== "false" : true;
 
-  const status = statusRaw ? parseEnumValue(schema.messageStatusEnum.enumValues, statusRaw) : null;
-  const messageType = messageTypeRaw ? parseEnumValue(schema.messageTypeEnum.enumValues, messageTypeRaw) : null;
-  const startDate = start ? parseDateSafe(start) : null;
-  const endDate = end ? parseDateSafe(end) : null;
+    const status = statusRaw ? parseEnumValue(schema.messageStatusEnum.enumValues, statusRaw) : null;
+    const messageType = messageTypeRaw ? parseEnumValue(schema.messageTypeEnum.enumValues, messageTypeRaw) : null;
+    const startDate = start ? parseDateSafe(start) : null;
+    const endDate = end ? parseDateSafe(end) : null;
 
-  const hasMedia = hasMediaRaw ? parseBoolSafe(hasMediaRaw) : null;
-  if (hasMediaRaw && hasMedia == null) {
-    return new Response(JSON.stringify({ error: "hasMedia must be true|false" }), {
-      status: 400,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
-  }
+    const hasMedia = hasMediaRaw ? parseBoolSafe(hasMediaRaw) : null;
+    if (hasMediaRaw && hasMedia == null) {
+      return new Response(JSON.stringify({ error: "hasMedia must be true|false" }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
 
-  const isDeleted = isDeletedRaw ? parseBoolSafe(isDeletedRaw) : null;
-  if (isDeletedRaw && isDeleted == null) {
-    return new Response(JSON.stringify({ error: "isDeleted must be true|false" }), {
-      status: 400,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
-  }
+    const isDeleted = isDeletedRaw ? parseBoolSafe(isDeletedRaw) : null;
+    if (isDeletedRaw && isDeleted == null) {
+      return new Response(JSON.stringify({ error: "isDeleted must be true|false" }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
 
   const edited = editedRaw ? parseBoolSafe(editedRaw) : null;
   if (editedRaw && edited == null) {
@@ -436,4 +413,7 @@ export async function GET(request: NextRequest) {
       "cache-control": "no-store",
     },
   });
+  } catch (error: unknown) {
+    return toInternalServerErrorResponse(error, "导出消息失败");
+  }
 }

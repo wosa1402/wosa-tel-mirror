@@ -3,24 +3,10 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
-import { toPublicErrorMessage } from "@/lib/api-error";
+import { getErrorCauseMessage, toPublicErrorMessage } from "@/lib/api-error";
 import { getTrimmedString, parseIntSafe } from "@/lib/utils";
 
 loadEnv();
-
-function getErrorCauseMessage(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  if (!("cause" in error)) return null;
-  const cause = (error as { cause?: unknown }).cause;
-  if (!cause) return null;
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  try {
-    return JSON.stringify(cause);
-  } catch {
-    return String(cause);
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {

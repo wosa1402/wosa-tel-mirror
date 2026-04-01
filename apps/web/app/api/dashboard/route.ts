@@ -3,23 +3,10 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@tg-back/db";
 import { loadEnv } from "@/lib/env";
 import { requireApiAuth } from "@/lib/api-auth";
-import { toPublicErrorMessage } from "@/lib/api-error";
+import { getErrorCauseMessage, toPublicErrorMessage } from "@/lib/api-error";
+import { toNumberOrNull } from "@/lib/utils";
 
 loadEnv();
-
-function getErrorCauseMessage(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  if (!("cause" in error)) return null;
-  const cause = (error as { cause?: unknown }).cause;
-  if (!cause) return null;
-  if (cause instanceof Error) return cause.message;
-  if (typeof cause === "string") return cause;
-  try {
-    return JSON.stringify(cause);
-  } catch {
-    return String(cause);
-  }
-}
 
 function toIsoStringOrNull(value: unknown): string | null {
   if (typeof value === "string") {
@@ -28,17 +15,6 @@ function toIsoStringOrNull(value: unknown): string | null {
   }
   if (value == null) return null;
   return String(value);
-}
-
-function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
 }
 
 function parseMirrorServiceHeartbeat(value: unknown): { lastHeartbeatAt: string | null; startedAt: string | null; pid: number | null } {

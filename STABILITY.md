@@ -120,6 +120,17 @@ systemctl restart wosa-tel.service
 
 ## 已做的稳定性优化（记录）
 
+### 2026-03-01：数据库更“省心”（自动清理日志 + 优雅关库）
+
+1) `sync_events` 自动清理（防止“日志表无限长大”）
+- 默认保留最近 **30 天**的同步事件日志，过期的会在后台分批删除（不影响正常同步）。
+- 你可以在 `.env` 里改保留天数：`TG_BACK_SYNC_EVENTS_RETENTION_DAYS=30`
+  - 设置为 `0` 表示禁用清理（不推荐长期禁用）。
+
+2) mirror-service 停止时会把数据库连接正常关掉
+- 以前如果你频繁重启服务，可能会出现“旧连接没断干净”的情况。
+- 现在在收到 `SIGTERM/SIGINT` 退出信号时，会显式调用 `sqlClient.end()` / `listenSqlClient.end()` 关闭连接，更干净更稳。
+
 ### 2026-02-27：启动更耐断、更不容易卡死
 
 1) mirror-service 启动“会等你”

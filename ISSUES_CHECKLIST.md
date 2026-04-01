@@ -2,7 +2,7 @@
 
 > 目的：把“发现的问题 + 修复状态 + 验收方法”记录在一个地方，方便你后续按优先级逐个完成。
 >
-> 最后更新：2026-02-28
+> 最后更新：2026-03-02
 >
 > 状态说明：
 > - [x] 已修复：代码已改完（并通过 `pnpm -r typecheck`）
@@ -118,7 +118,11 @@
 
 - [x] **[高] 工具函数重复（应抽到共享 utils）**
   - 修复：新增 `apps/web/lib/utils.ts`，并把 API 路由与前端组件统一改为复用该文件导出的工具函数。
-  - 补充收敛：`toStringOrNull / formatTime / calcProgressPct / isMirrorMode` 等也已收敛到 `apps/web/lib/utils.ts`；`api-error.ts` 复用 `getErrorMessage()` 避免重复实现。
+  - 补充收敛：
+    - 查询解析/转换：`toStringOrNull / toNumberOrNull / parseBoolSafe / parseDateSafe`
+    - 进度/展示：`formatTime / calcProgressPct / isMirrorMode`
+    - Telegram 工具：`buildTelegramMessageLink`（`apps/web/lib/telegram-links.ts`）、`getTelegramErrorMessage`（`apps/web/lib/telegram-errors.ts`）
+    - 错误工具：`getErrorCauseMessage`（`apps/web/lib/api-error.ts`），并由 `api-error.ts` 复用 `getErrorMessage()` 避免重复实现。
   - 验收：上述工具函数在代码中只保留一份实现（其它地方仅 import 使用）。
 
 - [x] **[中] 加密函数重复：`decrypt` 在 web 与 mirror-service 各一份**
@@ -174,6 +178,18 @@
   - 相关位置：`packages/db/src/schema/message-mappings.ts`、`packages/db/drizzle/migrations/0008_huge_shotgun.sql`
   - 部署提示：服务器上需要执行一次 `pnpm db:migrate` 才会真正把索引建到数据库。
 
+- [x] **[高] `message_mappings` 缺少 `mirror_channel_id` 索引（删除镜像频道会很慢）**
+  - 背景：`message_mappings.mirror_channel_id` 外键是 `ON DELETE CASCADE`；没有索引时，删除镜像频道会对整张表做全表扫描找要级联删除的行。
+  - 修复：增加 `message_mappings(mirror_channel_id)` 的 btree 索引（`mirror_channel_idx`）。
+  - 相关位置：`packages/db/src/schema/message-mappings.ts`、`packages/db/drizzle/migrations/0009_wakeful_terrax.sql`
+  - 部署提示：服务器上需要执行一次 `pnpm db:migrate` 才会真正把索引建到数据库。
+
+- [x] **[中] `message_edits` 存在冗余索引（浪费存储/写入性能）**
+  - 背景：同一组列上同时存在 `uniqueIndex` + 普通 `index`，普通索引没有额外价值（唯一索引本身就可用于查询）。
+  - 修复：删除冗余的 `message_edits_mapping_version_idx`，保留唯一索引 `unique_message_edit_version`。
+  - 相关位置：`packages/db/src/schema/message-edits.ts`、`packages/db/drizzle/migrations/0009_wakeful_terrax.sql`
+  - 部署提示：服务器上需要执行一次 `pnpm db:migrate` 才会真正把变更应用到数据库。
+
 ---
 
 ## 6) 依赖管理
@@ -194,6 +210,26 @@
   - 修复：`NODE_ENV=production` 时，API 500 错误只返回“简短友好提示”，不直接回显内部异常详情；详细信息仍会 `console.error` 留在服务端日志（开发环境仍保留详细错误文本）。
   - 相关位置：`apps/web/lib/api-error.ts`（各 API route 调用）
 
+- [x] **[高] 多个 API 路由缺少 try-catch / 认证逻辑在 try 外（异常时无法返回干净 JSON）**
+  - 影响：数据库抖动/配置错误时，接口可能直接抛出未处理异常，前端收到不可预期的 500（甚至不是 JSON）。
+  - 修复：
+    - 增加统一的 500 JSON 返回封装：`apps/web/lib/api-response.ts`（`toInternalServerErrorResponse`）。
+    - 为以下路由补齐 try-catch，并确保 `requireApiAuth()` 在 try 内：
+      - `apps/web/app/api/telegram/login/status/route.ts`
+      - `apps/web/app/api/telegram/logout/route.ts`
+      - `apps/web/app/api/auth/logout/route.ts`
+      - `apps/web/app/api/export/channels/route.ts`
+      - `apps/web/app/api/export/presets/route.ts`
+      - `apps/web/app/api/stream/tasks/route.ts`
+    - 同时把 `apps/web/app/api/channels/route.ts`、`apps/web/app/api/export/messages/route.ts`、`apps/web/app/api/telegram/dialogs/route.ts`、`apps/web/app/api/telegram/login/send-code/route.ts`、`apps/web/app/api/telegram/login/verify-code/route.ts` 的 `requireApiAuth()` 移入 try，避免认证逻辑抛错时无法统一返回 JSON。
+  - 验收：手动把数据库关掉/填错连接串时，这些接口应返回 `{ error: "..." }` 的 JSON（生产环境不会回显内部堆栈）。
+
+- [x] **[中] Telegram 相关接口错误码误用（服务端故障也返回 400）**
+  - 影响：前端/用户很难区分“输入问题”和“服务端故障”，也不利于监控告警。
+  - 修复：
+    - `send-code / verify-code / dialogs`：Telegram 返回的业务错误仍用 400；其余内部错误改为 500。
+  - 相关位置：`apps/web/app/api/telegram/login/send-code/route.ts`、`apps/web/app/api/telegram/login/verify-code/route.ts`、`apps/web/app/api/telegram/dialogs/route.ts`
+
 - [x] **[中] `sync_tasks` 缺唯一约束导致并发竞态（可能插入重复任务）**
   - 影响：并发请求（或多进程/多实例）下可能创建重复任务，导致 mirror-service 调度混乱。
   - 修复：新增唯一索引 `(source_channel_id, task_type)`，并把相关 insert 改为 `ON CONFLICT DO NOTHING`（幂等）。
@@ -202,6 +238,18 @@
 
 - [x] **[中] mirror-service 致命错误后进程不退出（可能出现“僵尸进程”）**
   - 修复：顶层 `loop().catch()` 在捕获到不可恢复异常时直接 `process.exit(1)`，让 systemd/容器按策略拉起。
+  - 相关位置：`apps/mirror-service/src/index.ts`
+
+- [x] **[中] `sync_events` 无清理机制（日志表只增不删会无限增长）**
+  - 影响：时间久了会拖慢查询、增加数据库存储成本，甚至影响整体稳定性。
+  - 修复：
+    - mirror-service 增加后台清理任务：按“保留天数”分批删除过期事件（默认保留 30 天；可设置为 0 禁用）。
+    - 同时新增 `sync_events(created_at)` 索引，加速按时间范围的清理/查询。
+  - 相关位置：`apps/mirror-service/src/lib/sync-events-cleanup.ts`、`.env.example`、`packages/db/src/schema/sync-events.ts`、`packages/db/drizzle/migrations/0010_good_namorita.sql`
+  - 配置：`.env` 里可设置 `TG_BACK_SYNC_EVENTS_RETENTION_DAYS`（默认 30）。
+
+- [x] **[中] mirror-service 停止时数据库连接未优雅关闭（可能导致连接泄漏）**
+  - 修复：在 `SIGINT/SIGTERM` 的 shutdown handler 中显式调用 `sqlClient.end()` / `listenSqlClient.end()` 关闭连接。
   - 相关位置：`apps/mirror-service/src/index.ts`
 
 - [x] **[中] mirror-service 中存在较多 `catch { ... }` 兜底/忽略错误**
@@ -229,6 +277,7 @@
 - 2026-02-27：开始拆分 `apps/mirror-service/src/index.ts`：抽离 settings 与 DB retry 模块
 - 2026-02-28：新增 GitHub Actions CI：自动跑 `pnpm typecheck` + `pnpm test`（推送/PR 自动检查）
 - 2026-02-28：安全/一致性补强：限流默认不信任 XFF、settings PATCH 限流 + 生产环境首次启动自动生成初始访问密码、sync_tasks 唯一约束与消息分页复合索引、channels API 迁移保护逻辑去重、mirror-service 致命错误直接退出
+- 2026-03-02：API 稳健性补强：补齐缺失的 try-catch、把 requireApiAuth 移入 try、Telegram 相关接口区分 400/500、统一 500 JSON 返回工具；并进一步收敛多处重复的解析/链接/错误工具函数到 `apps/web/lib/*`
 
 ---
 

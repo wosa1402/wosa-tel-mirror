@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { messageMappings } from "./message-mappings";
 
 export const messageEdits = pgTable(
@@ -16,7 +16,5 @@ export const messageEdits = pgTable(
   },
   (table) => ({
     uniqueMappingVersion: uniqueIndex("unique_message_edit_version").on(table.messageMappingId, table.version),
-    mappingVersionIdx: index("message_edits_mapping_version_idx").on(table.messageMappingId, table.version),
   }),
 );
-

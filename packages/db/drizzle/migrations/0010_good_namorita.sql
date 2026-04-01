@@ -1,0 +1,1 @@
+CREATE INDEX "event_created_at_idx" ON "sync_events" USING btree ("created_at");

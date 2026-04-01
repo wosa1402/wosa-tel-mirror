@@ -9,6 +9,20 @@ export function parseIntSafe(value: string): number | null {
   return n;
 }
 
+export function parseBoolSafe(value: string): boolean | null {
+  const v = value.trim().toLowerCase();
+  if (!v) return null;
+  if (v === "1" || v === "true" || v === "yes" || v === "y") return true;
+  if (v === "0" || v === "false" || v === "no" || v === "n") return false;
+  return null;
+}
+
+export function parseDateSafe(value: string): Date | null {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
 export function parseEnumValue<T extends readonly string[]>(allowed: T, value: string): T[number] | null {
   return (allowed as readonly string[]).includes(value) ? (value as T[number]) : null;
 }
@@ -40,6 +54,17 @@ export function toStringOrNull(value: unknown): string | null {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "string") return value;
   return String(value);
+}
+
+export function toNumberOrNull(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
 export function isMirrorMode(value: unknown): value is "forward" | "copy" {

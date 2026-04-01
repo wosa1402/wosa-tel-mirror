@@ -23,7 +23,7 @@ export const sourceChannels = pgTable(
     isProtected: boolean("is_protected").default(false).notNull(),
     memberCount: integer("member_count"),
     totalMessages: integer("total_messages"),
-    mirrorMode: mirrorModeEnum("mirror_mode").default("forward"),
+    mirrorMode: mirrorModeEnum("mirror_mode").default("forward").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     priority: integer("priority").default(0).notNull(),
     messageFilterMode: messageFilterModeEnum("message_filter_mode").default("inherit").notNull(),

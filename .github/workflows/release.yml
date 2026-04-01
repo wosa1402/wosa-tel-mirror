@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build Web (Next.js standalone)
+        run: pnpm -C apps/web build
+
+      - name: Build Mirror Service (esbuild)
+        run: pnpm -C apps/mirror-service build
+
+      - name: Package release artifact
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          RELEASE_DIR="tg-back-${TAG}"
+          mkdir -p "${RELEASE_DIR}"
+
+          # -- Web: standalone output --
+          cp -r apps/web/.next/standalone "${RELEASE_DIR}/web"
+          # static assets are not included in standalone, copy them
+          cp -r apps/web/.next/static "${RELEASE_DIR}/web/apps/web/.next/static"
+          # public folder (if exists)
+          if [ -d apps/web/public ]; then
+            cp -r apps/web/public "${RELEASE_DIR}/web/apps/web/public"
+          fi
+
+          # -- Mirror Service: bundled JS --
+          mkdir -p "${RELEASE_DIR}/mirror-service"
+          cp apps/mirror-service/dist/index.js "${RELEASE_DIR}/mirror-service/index.js"
+
+          # -- DB migrations --
+          mkdir -p "${RELEASE_DIR}/db"
+          cp -r packages/db/drizzle "${RELEASE_DIR}/db/drizzle"
+          cp packages/db/drizzle.config.cjs "${RELEASE_DIR}/db/drizzle.config.cjs"
+          cp packages/db/package.json "${RELEASE_DIR}/db/package.json"
+
+          # -- Config & scripts --
+          cp .env.example "${RELEASE_DIR}/.env.example"
+
+          # -- Start scripts --
+          cat > "${RELEASE_DIR}/start-web.sh" << 'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          cd "${SCRIPT_DIR}/web/apps/web"
+          export NODE_ENV=production
+          exec node server.js
+          SCRIPT
+          chmod +x "${RELEASE_DIR}/start-web.sh"
+
+          cat > "${RELEASE_DIR}/start-mirror.sh" << 'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          cd "${SCRIPT_DIR}"
+          export NODE_ENV=production
+          exec node mirror-service/index.js
+          SCRIPT
+          chmod +x "${RELEASE_DIR}/start-mirror.sh"
+
+          cat > "${RELEASE_DIR}/start-all.sh" << 'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+          cleanup() { kill 0; wait; }
+          trap cleanup SIGINT SIGTERM
+
+          "${SCRIPT_DIR}/start-web.sh" &
+          "${SCRIPT_DIR}/start-mirror.sh" &
+          wait
+          SCRIPT
+          chmod +x "${RELEASE_DIR}/start-all.sh"
+
+          cat > "${RELEASE_DIR}/migrate.sh" << 'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          cd "${SCRIPT_DIR}/db"
+          npx drizzle-kit migrate --config drizzle.config.cjs
+          SCRIPT
+          chmod +x "${RELEASE_DIR}/migrate.sh"
+
+          # -- Create tarball --
+          tar -czf "${RELEASE_DIR}.tar.gz" "${RELEASE_DIR}"
+          echo "RELEASE_DIR=${RELEASE_DIR}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.RELEASE_DIR }}.tar.gz
+          generate_release_notes: true
