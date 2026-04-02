@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "发布版本号，例如 v1.0.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -23,6 +29,28 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Resolve Release Metadata
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          case "${TAG}" in
+            v*)
+              ;;
+            *)
+              echo "release tag must start with v, got: ${TAG}" >&2
+              exit 1
+              ;;
+          esac
+
+          NODE_VERSION="$(node -p "process.version.slice(1)")"
+
+          echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "BUNDLED_NODE_VERSION=${NODE_VERSION}" >> "$GITHUB_ENV"
+
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
@@ -40,9 +68,17 @@ jobs:
 
       - name: Package release artifact
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          RELEASE_DIR="tg-back-${TAG}"
+          TAG="${RELEASE_TAG}"
+          RELEASE_DIR="tg-back-${TAG}-linux-x64"
+          NODE_DIST="node-v${BUNDLED_NODE_VERSION}-linux-x64"
           mkdir -p "${RELEASE_DIR}"
+
+          # -- Bundled Node.js runtime (Linux x64) --
+          mkdir -p "${RELEASE_DIR}/runtime"
+          curl -fsSL "https://nodejs.org/dist/v${BUNDLED_NODE_VERSION}/${NODE_DIST}.tar.xz" -o "${NODE_DIST}.tar.xz"
+          tar -xJf "${NODE_DIST}.tar.xz" -C "${RELEASE_DIR}/runtime"
+          mv "${RELEASE_DIR}/runtime/${NODE_DIST}" "${RELEASE_DIR}/runtime/node"
+          rm -f "${NODE_DIST}.tar.xz"
 
           # -- Web: standalone output --
           cp -r apps/web/.next/standalone "${RELEASE_DIR}/web"
@@ -71,9 +107,13 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          NODE_BIN="${SCRIPT_DIR}/runtime/node/bin/node"
+          if [ ! -x "${NODE_BIN}" ]; then
+            NODE_BIN="node"
+          fi
           cd "${SCRIPT_DIR}/web/apps/web"
           export NODE_ENV=production
-          exec node server.js
+          exec "${NODE_BIN}" server.js
           SCRIPT
           chmod +x "${RELEASE_DIR}/start-web.sh"
 
@@ -81,9 +121,13 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          NODE_BIN="${SCRIPT_DIR}/runtime/node/bin/node"
+          if [ ! -x "${NODE_BIN}" ]; then
+            NODE_BIN="node"
+          fi
           cd "${SCRIPT_DIR}"
           export NODE_ENV=production
-          exec node mirror-service/index.js
+          exec "${NODE_BIN}" mirror-service/index.js
           SCRIPT
           chmod +x "${RELEASE_DIR}/start-mirror.sh"
 
@@ -105,18 +149,48 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          NPX_BIN="${SCRIPT_DIR}/runtime/node/bin/npx"
+          if [ ! -x "${NPX_BIN}" ]; then
+            NPX_BIN="npx"
+          fi
           cd "${SCRIPT_DIR}/db"
-          npx drizzle-kit migrate --config drizzle.config.cjs
+          exec "${NPX_BIN}" --yes drizzle-kit@0.31.4 migrate --config drizzle.config.cjs
           SCRIPT
           chmod +x "${RELEASE_DIR}/migrate.sh"
+
+          cat > "${RELEASE_DIR}/README-release.md" << 'SCRIPT'
+          # tg-back 发布包（Linux x64）
+
+          这个压缩包已经包含：
+          - Web 管理界面
+          - mirror-service
+          - 数据库迁移文件
+          - Linux x64 的 Node.js 运行时
+
+          使用步骤：
+
+          1. 解压：
+             tar -xzf tg-back-<版本>-linux-x64.tar.gz
+          2. 进入目录并配置环境变量：
+             cp .env.example .env
+          3. 执行数据库迁移：
+             ./migrate.sh
+          4. 启动服务：
+             ./start-all.sh
+
+          如果你只想单独启动某一个进程，也可以分别运行：
+          - ./start-web.sh
+          - ./start-mirror.sh
+          SCRIPT
 
           # -- Create tarball --
           tar -czf "${RELEASE_DIR}.tar.gz" "${RELEASE_DIR}"
           echo "RELEASE_DIR=${RELEASE_DIR}" >> "$GITHUB_ENV"
-          echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           files: ${{ env.RELEASE_DIR }}.tar.gz
           generate_release_notes: true

@@ -147,6 +147,70 @@ pnpm -C apps/web build
 
 ---
 
+## 自动发版（GitHub Releases）
+
+仓库已经配置了 GitHub Actions 自动发版，但要注意：
+
+- 普通 `push` / `git push`：只会跑 CI 检查，不会创建 GitHub Release
+- 真正发布版本：需要下面两种方式之一
+
+### 方式 1：推送版本标签（推荐）
+
+例如发布 `v1.0.0`：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+触发后，GitHub Actions 会自动：
+
+- 运行 `typecheck` 和测试
+- 构建 Web 与 mirror-service
+- 生成 GitHub Release
+- 上传 Linux x64 发布包：`tg-back-v1.0.0-linux-x64.tar.gz`
+
+### 方式 2：在 GitHub 网页手动触发
+
+进入仓库的：
+
+- `Actions`
+- 选择 `Release`
+- 点击 `Run workflow`
+- 输入版本号，例如 `v1.0.0`
+
+### 发布包里包含什么
+
+当前发布包是 **Linux x64 运行包**，里面已经包含：
+
+- Web 管理界面
+- mirror-service
+- 数据库迁移文件
+- Linux x64 的 Node.js 运行时
+
+也就是说，服务器上**不需要额外安装 Node.js** 就可以启动这个发布包。
+
+### 发布包怎么用
+
+```bash
+tar -xzf tg-back-v1.0.0-linux-x64.tar.gz
+cd tg-back-v1.0.0-linux-x64
+cp .env.example .env
+./migrate.sh
+./start-all.sh
+```
+
+如果你只想单独启动某一个服务，也可以：
+
+```bash
+./start-web.sh
+./start-mirror.sh
+```
+
+> 注意：当前自动发布的是 **Linux x64** 版本。如果你后面还想要 Windows 或 macOS 的安装包，也可以继续加。
+
+---
+
 ## 常用页面
 
 - `/`：仪表盘 + 最近事件 + Telegram 登录
