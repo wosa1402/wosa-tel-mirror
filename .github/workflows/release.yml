@@ -17,6 +17,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tg_back
+      DATABASE_URL_DIRECT: postgresql://postgres:postgres@127.0.0.1:5432/tg_back
+      DATABASE_URL_LISTEN: postgresql://postgres:postgres@127.0.0.1:5432/tg_back
+      ENCRYPTION_SECRET: build-only-secret
+      TELEGRAM_API_ID: "1"
+      TELEGRAM_API_HASH: build-only-hash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
