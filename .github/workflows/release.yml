@@ -52,13 +52,13 @@ jobs:
           else
             SHORT_SHA="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
             BUILD_TIME="$(date -u +%Y%m%d-%H%M%S)"
-            TAG="dev-${BUILD_TIME}-${SHORT_SHA}"
-            RELEASE_KIND="prerelease"
-            RELEASE_NAME="测试版 ${BUILD_TIME}-${SHORT_SHA}"
+            TAG="release-${BUILD_TIME}-${SHORT_SHA}"
+            RELEASE_KIND="stable"
+            RELEASE_NAME="tgback"
             PACKAGE_PREFIX="tgback"
           fi
 
-          if [ "${RELEASE_KIND}" = "stable" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] || [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             case "${TAG}" in
               v*)
                 ;;
@@ -213,24 +213,7 @@ jobs:
           tar -czf "${RELEASE_DIR}.tar.gz" "${RELEASE_DIR}"
           echo "RELEASE_DIR=${RELEASE_DIR}" >> "$GITHUB_ENV"
 
-      - name: Create GitHub Pre-release
-        if: env.RELEASE_KIND == 'prerelease'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
-          name: ${{ env.RELEASE_NAME }}
-          body: |
-            这是 main 分支自动生成的测试版发布包。
-
-            - 分支：`${{ github.ref_name }}`
-            - 提交：`${{ github.sha }}`
-          files: ${{ env.RELEASE_DIR }}.tar.gz
-          prerelease: true
-          generate_release_notes: true
-
       - name: Create GitHub Release
-        if: env.RELEASE_KIND == 'stable'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
