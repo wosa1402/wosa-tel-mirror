@@ -151,10 +151,34 @@ pnpm -C apps/web build
 
 仓库已经配置了 GitHub Actions 自动发版，但要注意：
 
-- 普通 `push` / `git push`：只会跑 CI 检查，不会创建 GitHub Release
-- 真正发布版本：需要下面两种方式之一
+- 推送到 `main`：会自动生成一个**测试版发布包**
+- 推送 `v*` 标签：会自动生成一个**正式版 Release**
+- 如果你不想本地打标签，也可以在 GitHub 网页里手动发布正式版
 
-### 方式 1：推送版本标签（推荐）
+### 1. 平时开发：`push main` 自动出测试包
+
+例如你平时正常提交并推送：
+
+```bash
+git push origin main
+```
+
+触发后，GitHub Actions 会自动：
+
+- 运行 `typecheck` 和测试
+- 构建 Web 与 mirror-service
+- 生成一个 **GitHub 预发布版（pre-release）**
+- 上传 Linux x64 测试包
+
+测试版的标签名会自动生成，格式类似：
+
+```text
+dev-20260405-101530-90d851b
+```
+
+这类包适合你自己测试、部署验证，不建议当成正式稳定版本发给别人。
+
+### 2. 正式发布：推送版本标签
 
 例如发布 `v1.0.0`：
 
@@ -170,7 +194,7 @@ git push origin v1.0.0
 - 生成 GitHub Release
 - 上传 Linux x64 发布包：`tg-back-v1.0.0-linux-x64.tar.gz`
 
-### 方式 2：在 GitHub 网页手动触发
+### 3. 不想打标签：在 GitHub 网页手动发布正式版
 
 进入仓库的：
 
@@ -178,6 +202,12 @@ git push origin v1.0.0
 - 选择 `Release`
 - 点击 `Run workflow`
 - 输入版本号，例如 `v1.0.0`
+
+### 这样设计的好处
+
+- 你平时只要 `git push`，就能自动拿到可测试的发布包
+- 真正稳定版本还是用 `v1.0.0` 这种标签来区分，不容易混乱
+- 测试版和正式版会分开，后面找包更清楚
 
 ### 发布包里包含什么
 
