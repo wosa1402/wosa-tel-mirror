@@ -239,6 +239,49 @@ cp .env.example .env
 
 > 注意：当前自动发布的是 **Linux x64** 版本。如果你后面还想要 Windows 或 macOS 的安装包，也可以继续加。
 
+### 一键部署脚本（Linux 服务器）
+
+如果你想在服务器上“尽量一条命令搞定”，现在可以直接用仓库里的部署脚本：
+
+```bash
+curl -fsSL -o deploy-tgback.sh https://raw.githubusercontent.com/wosa1402/wosa-tel-mirror/main/scripts/deploy-release.sh
+bash deploy-tgback.sh
+```
+
+这个脚本会自动做这些事：
+
+- 下载最新正式版发布包
+- 解压到 `~/tgback/releases/`
+- 保留并复用你的 `.env`
+- 执行数据库迁移
+- 停掉旧进程
+- 启动新版本
+
+如果你已经有一份单独保存的环境变量文件，也可以这样：
+
+```bash
+bash deploy-tgback.sh --env-file /root/tgback.env --install-dir /opt/tgback
+```
+
+首次部署时，如果脚本发现还没有 `.env`，会自动生成一个示例文件：
+
+```bash
+~/tgback/shared/.env
+```
+
+你把里面这几个值填好以后，再重新执行一次脚本就可以完成部署：
+
+- `DATABASE_URL`
+- `ENCRYPTION_SECRET`
+- `TELEGRAM_API_ID`
+- `TELEGRAM_API_HASH`
+
+以后更新版本通常只要重新跑一次：
+
+```bash
+bash deploy-tgback.sh
+```
+
 ---
 
 ## 常用页面

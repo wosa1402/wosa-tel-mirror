@@ -11,6 +11,7 @@
     "dev:mirror": "pnpm -C apps/mirror-service dev",
     "dev:all": "node scripts/run-all.mjs dev",
     "dev:web": "pnpm -C apps/web dev",
+    "deploy:release": "bash scripts/deploy-release.sh",
     "poc": "pnpm -C apps/mirror-service poc",
     "start:web": "pnpm -C apps/web start",
     "start:mirror": "node apps/mirror-service/dist/index.js",
