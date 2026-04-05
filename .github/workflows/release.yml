@@ -42,17 +42,20 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
             RELEASE_KIND="stable"
-            RELEASE_NAME="${TAG}"
+            RELEASE_NAME="tgback"
+            PACKAGE_PREFIX="tgback"
           elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             TAG="${GITHUB_REF#refs/tags/}"
             RELEASE_KIND="stable"
-            RELEASE_NAME="${TAG}"
+            RELEASE_NAME="tgback"
+            PACKAGE_PREFIX="tgback"
           else
             SHORT_SHA="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
             BUILD_TIME="$(date -u +%Y%m%d-%H%M%S)"
             TAG="dev-${BUILD_TIME}-${SHORT_SHA}"
             RELEASE_KIND="prerelease"
             RELEASE_NAME="测试版 ${BUILD_TIME}-${SHORT_SHA}"
+            PACKAGE_PREFIX="tgback"
           fi
 
           if [ "${RELEASE_KIND}" = "stable" ]; then
@@ -71,6 +74,7 @@ jobs:
           echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
           echo "RELEASE_KIND=${RELEASE_KIND}" >> "$GITHUB_ENV"
           echo "RELEASE_NAME=${RELEASE_NAME}" >> "$GITHUB_ENV"
+          echo "PACKAGE_PREFIX=${PACKAGE_PREFIX}" >> "$GITHUB_ENV"
           echo "BUNDLED_NODE_VERSION=${NODE_VERSION}" >> "$GITHUB_ENV"
 
       - name: Install Dependencies
@@ -91,7 +95,7 @@ jobs:
       - name: Package release artifact
         run: |
           TAG="${RELEASE_TAG}"
-          RELEASE_DIR="tg-back-${TAG}-linux-x64"
+          RELEASE_DIR="${PACKAGE_PREFIX}-${TAG}-linux-x64"
           NODE_DIST="node-v${BUNDLED_NODE_VERSION}-linux-x64"
           mkdir -p "${RELEASE_DIR}"
 

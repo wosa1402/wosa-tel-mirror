@@ -192,7 +192,7 @@ git push origin v1.0.0
 - 运行 `typecheck` 和测试
 - 构建 Web 与 mirror-service
 - 生成 GitHub Release
-- 上传 Linux x64 发布包：`tg-back-v1.0.0-linux-x64.tar.gz`
+- 上传 Linux x64 发布包：`tgback-v1.0.0-linux-x64.tar.gz`
 
 ### 3. 不想打标签：在 GitHub 网页手动发布正式版
 
@@ -223,8 +223,8 @@ git push origin v1.0.0
 ### 发布包怎么用
 
 ```bash
-tar -xzf tg-back-v1.0.0-linux-x64.tar.gz
-cd tg-back-v1.0.0-linux-x64
+tar -xzf tgback-v1.0.0-linux-x64.tar.gz
+cd tgback-v1.0.0-linux-x64
 cp .env.example .env
 ./migrate.sh
 ./start-all.sh
